@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use bevy_ascii_terminal::Tile;
-use bracket_lib::prelude::{Point, RandomNumberGenerator, Rect};
+use bracket_lib::prelude::{Algorithm2D, BaseMap, Point, RandomNumberGenerator, Rect};
 
-use crate::{BlockMove, Layer, Player, Position, LAYER_MAP, LAYER_PLAYER};
+use crate::{BlockMove, Fov, Layer, Opaque, Player, Position, LAYER_MAP, LAYER_PLAYER};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TileType {
@@ -50,6 +50,13 @@ impl TileType {
         }
     }
 
+    pub fn is_opaque(&self) -> bool {
+        match self {
+            TileType::Wall => true,
+            TileType::Floor => false,
+        }
+    }
+
     pub fn spawn(&self, commands: &mut Commands, position: Position) -> Entity {
         let mut entity = commands.spawn();
         entity
@@ -60,6 +67,9 @@ impl TileType {
         if self.is_blocking() {
             entity.insert(BlockMove);
         }
+        if self.is_opaque() {
+            entity.insert(Opaque);
+        }
 
         entity.id()
     }
@@ -69,7 +79,8 @@ impl TileType {
 pub struct Map {
     width: usize,
     height: usize,
-    tiles: HashMap<Position, Vec<Entity>>,
+    pub tiles: HashMap<Position, Vec<Entity>>,
+    pub opaque: HashSet<Position>,
 }
 
 #[allow(dead_code)]
@@ -79,7 +90,15 @@ impl Map {
             width,
             height,
             tiles: HashMap::new(),
+            opaque: HashSet::new(),
         }
+    }
+
+    pub fn is_in_bounds(&self, position: &Position) -> bool {
+        position.x >= 0
+            && position.y >= 0
+            && position.x < self.width as i32
+            && position.y < self.height as i32
     }
 
     pub fn width(&self) -> usize {
@@ -93,13 +112,28 @@ impl Map {
     pub fn at_position(&self, position: &Position) -> Vec<Entity> {
         self.tiles.get(position).cloned().unwrap_or_default()
     }
+
+    pub fn idx_position<T>(&self, idx: T) -> Option<Position>
+    where
+        T: TryInto<usize>,
+    {
+        let idx = idx.try_into().ok()?;
+        if idx >= self.width * self.height {
+            None
+        } else {
+            let x = idx % self.width;
+            let y = idx / self.width;
+            Some(Position::new(x, y))
+        }
+    }
 }
 
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(build_map).add_system(collect_tiles);
+        app.add_startup_system(build_map)
+            .add_system_to_stage(CoreStage::PreUpdate, collect_tiles);
     }
 }
 
@@ -141,16 +175,41 @@ fn build_map(mut commands: Commands) {
             map_info.player_start.unwrap_or_else(Point::zero),
         ))
         .insert(Name::new("Player"))
-        .insert(Layer(LAYER_PLAYER));
+        .insert(Layer(LAYER_PLAYER))
+        .insert(Fov {
+            visible_tiles: HashSet::new(),
+            range: 8,
+        });
 }
 
-fn collect_tiles(mut map: ResMut<Map>, tiles: Query<(Entity, &Position), With<Tile>>) {
+fn collect_tiles(
+    mut map: ResMut<Map>,
+    tiles: Query<(Entity, &Position, Option<&BlockMove>, Option<&Opaque>), With<Tile>>,
+) {
     map.tiles.clear();
-    for (entity, position) in tiles.iter() {
+    for (entity, position, _blocks_move, opaque) in tiles.iter() {
         map.tiles
             .entry(*position)
             .or_insert(Vec::new())
             .push(entity);
+
+        if opaque.is_some() {
+            map.opaque.insert(*position);
+        }
+    }
+}
+
+impl Algorithm2D for Map {
+    fn dimensions(&self) -> Point {
+        Point::new(self.width, self.height)
+    }
+}
+
+impl BaseMap for Map {
+    fn is_opaque(&self, idx: usize) -> bool {
+        self.idx_position(idx)
+            .map(|pos| self.opaque.contains(&pos))
+            .unwrap_or(true)
     }
 }
 
