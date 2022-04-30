@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
-use bracket_lib::prelude::{field_of_view, Point, BLACK, RGBA};
+use bracket_lib::prelude::{field_of_view, Point};
 use itertools::Itertools;
 use map::{Map, MapPlugin};
 
@@ -112,23 +112,26 @@ pub struct Fov {
     pub range: u32,
 }
 
-trait AsBracket<T> {
-    fn as_bracket(&self) -> T;
+trait Grayscale {
+    fn grayscale(&self) -> Self;
 }
 
-impl AsBracket<RGBA> for Color {
-    fn as_bracket(&self) -> RGBA {
-        RGBA::from_f32(self.r(), self.g(), self.b(), self.a())
+impl Grayscale for Color {
+    fn grayscale(&self) -> Self {
+        let [r, g, b, _]: [f32; 4] = (*self).into();
+        let grey = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let grey = grey / 8.0;
+        Color::rgb(grey, grey, grey)
     }
 }
 
-trait AsBevy<T> {
-    fn as_bevy(&self) -> T;
-}
-
-impl AsBevy<Color> for RGBA {
-    fn as_bevy(&self) -> Color {
-        Color::rgba(self.r, self.g, self.b, self.a)
+impl Grayscale for Tile {
+    fn grayscale(&self) -> Self {
+        Self {
+            glyph: self.glyph,
+            fg_color: self.fg_color.grayscale(),
+            bg_color: self.bg_color.grayscale(),
+        }
     }
 }
 
@@ -169,22 +172,7 @@ fn render_map(
             let tile = if visible.is_some() {
                 *tile
             } else {
-                // TODO: implement lerp Bevy colors insted of using this mess
-                let fg_color = tile
-                    .fg_color
-                    .as_bracket()
-                    .lerp(RGBA::named(BLACK), 0.6)
-                    .as_bevy();
-                let bg_color = tile
-                    .bg_color
-                    .as_bracket()
-                    .lerp(RGBA::named(BLACK), 0.6)
-                    .as_bevy();
-                Tile {
-                    glyph: tile.glyph,
-                    fg_color,
-                    bg_color,
-                }
+                tile.grayscale()
             };
             (tile, position)
         });

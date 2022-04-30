@@ -3,13 +3,16 @@ edition = "2021"
 name = "roguelike-jam-2"
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
 
 [dependencies]
 bevy = {version = "0.7.0", features = ["dynamic"]}
 bevy-inspector-egui = "0.10.0"
-# bevy_ascii_terminal = {git = "https://github.com/vigdail/bevy_ascii_terminal.git", branch = "tile_component"}
-bevy_ascii_terminal = {path = "../other/bevy_ascii_terminal"}
+bevy_ascii_terminal = {git = "https://github.com/vigdail/bevy_ascii_terminal.git", branch = "tile_component"}
 bevy_tiled_camera = {git = "https://github.com/vigdail/bevy_tiled_camera.git"}
 bracket-lib = "0.8.1"
 itertools = "0.10.3"

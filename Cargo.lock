@@ -303,6 +303,7 @@ dependencies = [
 [[package]]
 name = "bevy_ascii_terminal"
 version = "0.9.0"
+source = "git+https://github.com/vigdail/bevy_ascii_terminal.git?branch=tile_component#8e25c44215005eb1ba3ac385c7efa0f272650de8"
 dependencies = [
  "bevy",
  "bitflags",

@@ -23,13 +23,13 @@ impl From<&TileType> for Tile {
         match ty {
             TileType::Wall => Tile {
                 glyph: '#',
-                bg_color: Color::DARK_GRAY,
-                fg_color: Color::BLACK,
+                bg_color: Color::BLACK,
+                fg_color: Color::SEA_GREEN,
             },
             TileType::Floor => Tile {
                 glyph: '.',
                 bg_color: Color::BLACK,
-                fg_color: Color::GRAY,
+                fg_color: Color::OLIVE,
             },
         }
     }
