@@ -1,5 +1,7 @@
 #![allow(clippy::type_complexity)]
+mod combat;
 mod components;
+mod events;
 mod map;
 mod monster;
 mod player;
@@ -12,6 +14,8 @@ use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view;
+use combat::{track_dead, Health};
+use events::{AttackEvent, MoveEvent};
 use itertools::Itertools;
 use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
@@ -25,6 +29,9 @@ const LAYER_PLAYER: u32 = 4;
 
 fn main() {
     App::new()
+        .add_state::<GameState>(GameState::WaitingInput)
+        .add_event::<AttackEvent>()
+        .add_event::<MoveEvent>()
         .insert_resource(WindowDescriptor {
             width: 1280.0,
             height: 720.0,
@@ -32,7 +39,6 @@ fn main() {
             resizable: false,
             ..default()
         })
-        .add_state::<GameState>(GameState::WaitingInput)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
@@ -45,6 +51,7 @@ fn main() {
         .add_system_set(
             SystemSet::on_update(GameState::WaitingInput).with_system(keyboard_handling),
         )
+        .add_system(track_dead)
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility))
@@ -150,23 +157,54 @@ fn keyboard_handling(
     states.set(GameState::PlayerTurn).unwrap();
 }
 
-pub fn movement(
+pub fn handle_want_to_move(
     mut commands: Commands,
+    mut attack_events: EventWriter<AttackEvent>,
+    mut move_events: EventWriter<MoveEvent>,
     map: Res<Map>,
-    mut units: Query<(Entity, &mut Position, &WantToMove)>,
-    blocks: Query<&BlockMove>,
+    actors: Query<(Entity, &WantToMove)>,
+    blocks: Query<Entity, With<BlockMove>>,
+    victims: Query<Entity, With<Health>>,
 ) {
-    for (entity, mut position, target_position) in units.iter_mut() {
-        let targets = map.at_position(&target_position.position);
-        if targets.into_iter().any(|e| blocks.get(e).is_ok()) {
-            info!(
-                "Unable to move to: {}, {}",
-                target_position.position.x, target_position.position.y
-            );
-        } else {
-            *position = target_position.position;
+    for (entity, to_move) in actors.iter() {
+        let at_position = map.tiles.get(&to_move.position);
+        if at_position.is_none() {
+            continue;
+        }
+
+        let at_position = at_position.unwrap();
+
+        let victim = at_position
+            .iter()
+            .find(|&&e| victims.get(e).ok().is_some())
+            .cloned();
+
+        if let Some(victim) = victim {
+            attack_events.send(AttackEvent {
+                attacker: entity,
+                target: victim,
+            });
+            commands.entity(entity).remove::<WantToMove>();
+            continue;
+        }
+
+        let can_move = at_position.iter().all(|&e| blocks.get(e).ok().is_none());
+
+        if can_move {
+            move_events.send(MoveEvent {
+                entity,
+                position: to_move.position,
+            });
         }
         commands.entity(entity).remove::<WantToMove>();
+    }
+}
+
+pub fn movement(mut move_events: EventReader<MoveEvent>, mut actors: Query<&mut Position>) {
+    for event in move_events.iter() {
+        if let Ok(mut position) = actors.get_mut(event.entity) {
+            *position = event.position;
+        }
     }
 }
 

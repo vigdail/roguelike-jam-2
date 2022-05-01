@@ -3,8 +3,11 @@ use bevy_ascii_terminal::Tile;
 use bracket_lib::prelude::RandomNumberGenerator;
 
 use crate::{
-    components::BlockMove, movement, states::GameState, Layer, Position, Unrevealable,
-    LAYER_MONSTER,
+    combat::{combat, Health},
+    components::BlockMove,
+    handle_want_to_move, movement,
+    states::GameState,
+    Layer, Position, Unrevealable, LAYER_MONSTER,
 };
 
 #[derive(Component)]
@@ -17,8 +20,10 @@ impl Plugin for MonsterPlugin {
         app.add_system_set(
             SystemSet::on_enter(GameState::MonsterTurn)
                 .with_system(monster_ai)
-                .with_system(movement.after(monster_ai))
-                .with_system(end_turn.after(monster_ai)),
+                .with_system(handle_want_to_move.after(monster_ai))
+                .with_system(combat.after(handle_want_to_move))
+                .with_system(movement.after(combat))
+                .with_system(end_turn.after(movement)),
         );
     }
 }
@@ -43,12 +48,13 @@ pub fn spawn_monster(commands: &mut Commands, position: &Position) -> Entity {
         .insert(Unrevealable)
         .insert(Name::new(name))
         .insert(BlockMove)
+        .insert(Health::new(10))
         .id()
 }
 
 pub fn monster_ai(monsters: Query<&Name, With<Monster>>) {
-    for name in monsters.iter() {
-        info!("{} shouts", name);
+    for _name in monsters.iter() {
+        // info!("{} shouts", name);
     }
 }
 

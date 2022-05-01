@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{movement, states::GameState};
+use crate::{combat::combat, handle_want_to_move, movement, states::GameState};
 
 pub struct PlayerPlugin;
 
@@ -8,7 +8,9 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(
             SystemSet::on_enter(GameState::PlayerTurn)
-                .with_system(movement)
+                .with_system(handle_want_to_move)
+                .with_system(combat.after(handle_want_to_move))
+                .with_system(movement.after(handle_want_to_move))
                 .with_system(end_turn.after(movement)),
         );
     }
