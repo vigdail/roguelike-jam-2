@@ -4,7 +4,10 @@ use bevy::prelude::*;
 use bevy_ascii_terminal::Tile;
 use bracket_lib::prelude::{Algorithm2D, BaseMap, Point, RandomNumberGenerator, Rect};
 
-use crate::{BlockMove, Fov, Layer, Opaque, Player, Position, LAYER_MAP, LAYER_PLAYER};
+use crate::{
+    monster::spawn_monster, BlockMove, Fov, Layer, Opaque, Player, Position, LAYER_MAP,
+    LAYER_PLAYER,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TileType {
@@ -163,6 +166,7 @@ fn build_map(mut commands: Commands) {
         .push_children(&tile_entities)
         .insert(Name::new("Map"));
 
+    // Spawn player
     commands
         .spawn()
         .insert(Player)
@@ -180,6 +184,12 @@ fn build_map(mut commands: Commands) {
             visible_tiles: HashSet::new(),
             range: 8,
         });
+
+    // Spawn monsters
+    map_info.rooms.iter().skip(1).for_each(|room| {
+        let center = room.center();
+        spawn_monster(&mut commands, &center.into());
+    });
 }
 
 fn collect_tiles(
@@ -217,6 +227,7 @@ pub struct MapInfo {
     pub width: usize,
     pub height: usize,
     pub tiles: Vec<TileType>,
+    pub rooms: Vec<Rect>,
     pub player_start: Option<Point>,
 }
 
@@ -226,6 +237,7 @@ impl MapInfo {
             width,
             height,
             player_start: None,
+            rooms: vec![],
             tiles: vec![TileType::Wall; width * height],
         }
     }
@@ -307,6 +319,7 @@ impl MapBuilder for RoomMapBuilder {
             .unwrap_or_else(Point::zero);
 
         map.player_start = Some(player_pos);
+        map.rooms = self.rooms.clone();
         map
     }
 }

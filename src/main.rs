@@ -1,18 +1,27 @@
 #![allow(clippy::type_complexity)]
+mod components;
 mod map;
+mod monster;
+mod player;
+mod states;
+mod utils;
 
-use std::collections::HashSet;
-
+use crate::components::*;
 use bevy::prelude::*;
 use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
-use bracket_lib::prelude::{field_of_view, Point};
+use bracket_lib::prelude::field_of_view;
 use itertools::Itertools;
 use map::{Map, MapPlugin};
+use monster::MonsterPlugin;
+use player::PlayerPlugin;
+use states::GameState;
+use utils::Grayscale;
 
-const LAYER_PLAYER: u32 = 4;
 const LAYER_MAP: u32 = 0;
+const LAYER_MONSTER: u32 = 3;
+const LAYER_PLAYER: u32 = 4;
 
 fn main() {
     App::new()
@@ -23,116 +32,23 @@ fn main() {
             resizable: false,
             ..default()
         })
+        .add_state::<GameState>(GameState::WaitingInput)
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(TerminalPlugin)
         .add_plugin(TiledCameraPlugin)
         .add_plugin(MapPlugin)
+        .add_plugin(PlayerPlugin)
+        .add_plugin(MonsterPlugin)
         .add_startup_system(setup_camera)
-        .add_system(keyboard_handling)
-        .add_system(movement)
+        .add_system_set(
+            SystemSet::on_update(GameState::WaitingInput).with_system(keyboard_handling),
+        )
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility))
         .run();
-}
-
-#[derive(Component)]
-pub struct MapViewTerminal;
-
-#[derive(Component, Default, PartialEq, Eq, Clone, Copy, Ord, PartialOrd)]
-pub struct Layer(pub u32);
-
-#[derive(Component, Clone, Copy)]
-pub struct BlockMove;
-
-#[derive(Component, Clone, Copy)]
-pub struct Opaque;
-
-#[derive(Component, Clone, Copy)]
-pub struct Revealed;
-
-#[derive(Component, Clone, Copy)]
-pub struct Visible;
-
-#[derive(Component, Default, PartialEq, Eq, Hash, Clone, Copy)]
-pub struct Position {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Position {
-    fn new<T>(x: T, y: T) -> Self
-    where
-        T: TryInto<i32>,
-    {
-        Self {
-            x: x.try_into().unwrap_or(0),
-            y: y.try_into().unwrap_or(0),
-        }
-    }
-}
-
-impl From<Point> for Position {
-    fn from(point: Point) -> Self {
-        Self::from(&point)
-    }
-}
-
-impl From<&Point> for Position {
-    fn from(point: &Point) -> Self {
-        Self {
-            x: point.x,
-            y: point.y,
-        }
-    }
-}
-
-impl From<&Position> for Point {
-    fn from(position: &Position) -> Self {
-        Self {
-            x: position.x,
-            y: position.y,
-        }
-    }
-}
-
-#[derive(Component)]
-pub struct Player;
-
-#[derive(Component)]
-pub struct WantToMove {
-    pub position: Position,
-}
-
-#[derive(Component)]
-pub struct Fov {
-    pub visible_tiles: HashSet<Position>,
-    pub range: u32,
-}
-
-trait Grayscale {
-    fn grayscale(&self) -> Self;
-}
-
-impl Grayscale for Color {
-    fn grayscale(&self) -> Self {
-        let [r, g, b, _]: [f32; 4] = (*self).into();
-        let grey = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        let grey = grey / 8.0;
-        Color::rgb(grey, grey, grey)
-    }
-}
-
-impl Grayscale for Tile {
-    fn grayscale(&self) -> Self {
-        Self {
-            glyph: self.glyph,
-            fg_color: self.fg_color.grayscale(),
-            bg_color: self.bg_color.grayscale(),
-        }
-    }
 }
 
 fn setup_camera(mut commands: Commands) {
@@ -183,42 +99,43 @@ fn render_map(
         }
     }
 }
+
 fn keyboard_handling(
     mut commands: Commands,
-    input: Res<Input<KeyCode>>,
+    mut input: ResMut<Input<KeyCode>>,
+    mut states: ResMut<State<GameState>>,
     players: Query<(Entity, &Position), With<Player>>,
 ) {
+    let just_pressed = input.get_just_pressed().next();
+    if just_pressed.is_none() {
+        return;
+    }
+
+    let key = just_pressed.cloned().unwrap();
     let mut delta = Position::new(0, 0);
-    if input.just_pressed(KeyCode::W) || input.just_pressed(KeyCode::Numpad8) {
-        delta.y += 1;
+    match key {
+        KeyCode::W | KeyCode::Numpad8 | KeyCode::Up => delta.y += 1,
+        KeyCode::S | KeyCode::Numpad2 | KeyCode::Down => delta.y -= 1,
+        KeyCode::A | KeyCode::Numpad4 | KeyCode::Left => delta.x -= 1,
+        KeyCode::D | KeyCode::Numpad6 | KeyCode::Right => delta.x += 1,
+        KeyCode::Numpad7 => {
+            delta.x -= 1;
+            delta.y += 1;
+        }
+        KeyCode::Numpad9 => {
+            delta.x += 1;
+            delta.y += 1;
+        }
+        KeyCode::Numpad1 => {
+            delta.x -= 1;
+            delta.y -= 1;
+        }
+        KeyCode::Numpad3 => {
+            delta.x += 1;
+            delta.y -= 1;
+        }
+        _ => {}
     }
-    if input.just_pressed(KeyCode::S) || input.just_pressed(KeyCode::Numpad2) {
-        delta.y -= 1;
-    }
-    if input.just_pressed(KeyCode::A) || input.just_pressed(KeyCode::Numpad4) {
-        delta.x -= 1;
-    }
-    if input.just_pressed(KeyCode::D) || input.just_pressed(KeyCode::Numpad6) {
-        delta.x += 1;
-    }
-
-    if input.just_pressed(KeyCode::Numpad7) {
-        delta.x -= 1;
-        delta.y += 1;
-    }
-    if input.just_pressed(KeyCode::Numpad9) {
-        delta.x += 1;
-        delta.y += 1;
-    }
-    if input.just_pressed(KeyCode::Numpad1) {
-        delta.x -= 1;
-        delta.y -= 1;
-    }
-    if input.just_pressed(KeyCode::Numpad3) {
-        delta.x += 1;
-        delta.y -= 1;
-    }
-
     if delta == Position::default() {
         return;
     }
@@ -228,9 +145,12 @@ fn keyboard_handling(
             position: Position::new(position.x + delta.x, position.y + delta.y),
         });
     }
+
+    input.reset(key);
+    states.set(GameState::PlayerTurn).unwrap();
 }
 
-fn movement(
+pub fn movement(
     mut commands: Commands,
     map: Res<Map>,
     mut units: Query<(Entity, &mut Position, &WantToMove)>,
@@ -250,29 +170,31 @@ fn movement(
     }
 }
 
-fn update_visibility(
+pub fn update_visibility(
     mut commands: Commands,
     map: Res<Map>,
-    fov: Query<&Fov, With<Player>>,
+    fov: Query<&Fov, (With<Player>, Changed<Fov>)>,
     visible: Query<Entity, With<Visible>>,
+    unrevealable: Query<Entity, With<Unrevealable>>,
 ) {
-    for entity in visible.iter() {
-        commands.entity(entity).remove::<Visible>();
-    }
-
     if let Ok(fov) = fov.get_single() {
+        for entity in visible.iter() {
+            commands.entity(entity).remove::<Visible>();
+        }
         for visible in fov.visible_tiles.iter() {
             if let Some(entities) = map.tiles.get(visible) {
                 for &entity in entities {
                     commands.entity(entity).insert(Visible);
-                    commands.entity(entity).insert(Revealed);
+                    if unrevealable.get(entity).is_err() {
+                        commands.entity(entity).insert(Revealed);
+                    }
                 }
             };
         }
     }
 }
 
-fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed<Position>>) {
+pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed<Position>>) {
     for (mut fov, position) in units.iter_mut() {
         fov.visible_tiles.clear();
         fov.visible_tiles =
