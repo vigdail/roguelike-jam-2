@@ -1,11 +1,15 @@
 use bevy::prelude::*;
 use bevy_ascii_terminal::Tile;
-use bracket_lib::prelude::RandomNumberGenerator;
+use bracket_lib::prelude::{
+    a_star_search, Algorithm2D, Bresenham, DistanceAlg, RandomNumberGenerator,
+};
 
 use crate::{
-    combat::{combat, Health},
-    components::BlockMove,
-    handle_want_to_move, movement,
+    combat::{combat, Attack, CombatStatsBundle, Health},
+    components::{BlockMove, Player, WantToMove},
+    handle_want_to_move,
+    map::Map,
+    movement,
     states::GameState,
     Layer, Position, Unrevealable, LAYER_MONSTER,
 };
@@ -31,9 +35,9 @@ impl Plugin for MonsterPlugin {
 pub fn spawn_monster(commands: &mut Commands, position: &Position) -> Entity {
     let mut rng = RandomNumberGenerator::new();
     let roll = rng.roll_dice(1, 6);
-    let (glyph, name) = match roll {
-        1 => ('o', "Ogre"),
-        _ => ('g', "Goblin"),
+    let (glyph, name, attack) = match roll {
+        1 => ('o', "Orc", Attack::new(1, 6)),
+        _ => ('g', "Goblin", Attack::new(1, 4)),
     };
     commands
         .spawn()
@@ -48,13 +52,57 @@ pub fn spawn_monster(commands: &mut Commands, position: &Position) -> Entity {
         .insert(Unrevealable)
         .insert(Name::new(name))
         .insert(BlockMove)
-        .insert(Health::new(10))
+        .insert_bundle(CombatStatsBundle {
+            health: Health::new(10),
+            attack,
+        })
         .id()
 }
 
-pub fn monster_ai(monsters: Query<&Name, With<Monster>>) {
-    for _name in monsters.iter() {
-        // info!("{} shouts", name);
+pub fn monster_ai(
+    mut commands: Commands,
+    map: Res<Map>,
+    players: Query<&Position, With<Player>>,
+    monsters: Query<(Entity, &Position, &Name), With<Monster>>,
+) {
+    let player_pos = players.get_single();
+    if player_pos.is_err() {
+        return;
+    }
+    let player_pos = player_pos.unwrap();
+    let vision_distance_squared = 36.0; // TODO
+    for (monster_entity, monster_pos, monster_name) in monsters.iter() {
+        let player_pos = player_pos.into();
+        let monster_pos = monster_pos.into();
+        if DistanceAlg::PythagorasSquared.distance2d(player_pos, monster_pos)
+            > vision_distance_squared
+        {
+            continue;
+        }
+        let mut line = Bresenham::new(player_pos, monster_pos);
+        if line.any(|p| map.opaque.contains(&p.into())) {
+            continue;
+        }
+
+        info!("{} sees the Player", monster_name);
+        let path = a_star_search(
+            map.point2d_to_index(monster_pos) as i32,
+            map.point2d_to_index(player_pos) as i32,
+            &*map,
+        );
+        info!(
+            "{}'s path {:?}, player_pos: {}",
+            monster_name,
+            path.steps,
+            map.point2d_to_index(player_pos)
+        );
+        if path.success && path.steps.len() > 1 {
+            if let Some(position) = map.idx_position(path.steps[1]) {
+                commands
+                    .entity(monster_entity)
+                    .insert(WantToMove { position });
+            }
+        }
     }
 }
 

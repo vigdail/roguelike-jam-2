@@ -1,9 +1,22 @@
 use bevy::prelude::*;
+use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use bracket_lib::prelude::RandomNumberGenerator;
 
 use crate::events::AttackEvent;
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, Inspectable)]
+pub struct Attack {
+    dice_count: u8,
+    dice: u8,
+}
+
+impl Attack {
+    pub fn new(dice_count: u8, dice: u8) -> Self {
+        Self { dice_count, dice }
+    }
+}
+
+#[derive(Component, Clone, Copy, Inspectable)]
 pub struct Health {
     pub current: u32,
     pub max: u32,
@@ -26,27 +39,43 @@ impl Health {
     }
 }
 
+#[derive(Bundle)]
+pub struct CombatStatsBundle {
+    pub health: Health,
+    pub attack: Attack,
+}
+
+pub struct CombatPlugin;
+
+impl Plugin for CombatPlugin {
+    fn build(&self, app: &mut App) {
+        app.register_inspectable::<Health>()
+            .register_inspectable::<Attack>();
+    }
+}
+
 pub fn combat(
     mut attack_events: EventReader<AttackEvent>,
-    attackers: Query<&Name>,
+    attackers: Query<(&Name, &Attack)>,
     mut victims: Query<(&mut Health, Option<&Name>)>,
 ) {
     let mut rng = RandomNumberGenerator::new();
     for event in attack_events.iter() {
-        let attacker = attackers
-            .get(event.attacker)
-            .ok()
-            .cloned()
-            .unwrap_or_else(|| Name::new("Unknown"));
+        let attacker = attackers.get(event.attacker).ok();
         let victim = victims.get_mut(event.target).ok();
 
         if let Some((mut victim_health, victim_name)) = victim {
-            let damage = rng.roll_dice(1, 6);
+            let damage = attacker
+                .map(|(_, attack)| rng.roll_dice(attack.dice_count as i32, attack.dice as i32))
+                .unwrap_or(0);
+
+            let attacker_name = attacker.map(|(name, _)| name).cloned().unwrap_or_default();
+
             victim_health.take_damage(damage);
             let victim_name = victim_name.cloned().unwrap_or_else(|| Name::new("Unknown"));
             info!(
                 "{} attacks {} with {} damage",
-                attacker, victim_name, damage
+                attacker_name, victim_name, damage
             );
         }
     }

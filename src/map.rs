@@ -2,81 +2,16 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use bevy_ascii_terminal::Tile;
-use bracket_lib::prelude::{Algorithm2D, BaseMap, Point, RandomNumberGenerator, Rect};
-
-use crate::{
-    monster::spawn_monster, BlockMove, Fov, Layer, Opaque, Player, Position, LAYER_MAP,
-    LAYER_PLAYER,
+use bracket_lib::prelude::{
+    Algorithm2D, BaseMap, DistanceAlg, Point, RandomNumberGenerator, Rect, SmallVec,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TileType {
-    Wall,
-    Floor,
-}
-
-impl From<TileType> for Tile {
-    fn from(ty: TileType) -> Self {
-        Tile::from(&ty)
-    }
-}
-
-impl From<&TileType> for Tile {
-    fn from(ty: &TileType) -> Self {
-        match ty {
-            TileType::Wall => Tile {
-                glyph: '#',
-                bg_color: Color::BLACK,
-                fg_color: Color::SEA_GREEN,
-            },
-            TileType::Floor => Tile {
-                glyph: '.',
-                bg_color: Color::BLACK,
-                fg_color: Color::OLIVE,
-            },
-        }
-    }
-}
-
-impl TileType {
-    pub fn as_name(&self) -> Name {
-        match self {
-            TileType::Wall => "Wall".into(),
-            TileType::Floor => "Floor".into(),
-        }
-    }
-
-    pub fn is_blocking(&self) -> bool {
-        match self {
-            TileType::Wall => true,
-            TileType::Floor => false,
-        }
-    }
-
-    pub fn is_opaque(&self) -> bool {
-        match self {
-            TileType::Wall => true,
-            TileType::Floor => false,
-        }
-    }
-
-    pub fn spawn(&self, commands: &mut Commands, position: Position) -> Entity {
-        let mut entity = commands.spawn();
-        entity
-            .insert(Tile::from(self))
-            .insert(position)
-            .insert(self.as_name())
-            .insert(Layer(LAYER_MAP));
-        if self.is_blocking() {
-            entity.insert(BlockMove);
-        }
-        if self.is_opaque() {
-            entity.insert(Opaque);
-        }
-
-        entity.id()
-    }
-}
+use crate::{
+    combat::{Attack, CombatStatsBundle, Health},
+    map_tile::TileType,
+    monster::spawn_monster,
+    BlockMove, Fov, Layer, Opaque, Player, Position, LAYER_PLAYER,
+};
 
 #[allow(dead_code)]
 pub struct Map {
@@ -84,6 +19,7 @@ pub struct Map {
     height: usize,
     pub tiles: HashMap<Position, Vec<Entity>>,
     pub opaque: HashSet<Position>,
+    pub blockers: HashSet<Position>,
 }
 
 #[allow(dead_code)]
@@ -94,6 +30,7 @@ impl Map {
             height,
             tiles: HashMap::new(),
             opaque: HashSet::new(),
+            blockers: HashSet::new(),
         }
     }
 
@@ -128,6 +65,13 @@ impl Map {
             let y = idx / self.width;
             Some(Position::new(x, y))
         }
+    }
+
+    fn is_exit_valid(&self, x: i32, y: i32) -> bool {
+        if !self.in_bounds(Point::new(x, y)) {
+            return false;
+        }
+        !self.blockers.contains(&Position::new(x, y))
     }
 }
 
@@ -183,6 +127,10 @@ fn build_map(mut commands: Commands) {
         .insert(Fov {
             visible_tiles: HashSet::new(),
             range: 8,
+        })
+        .insert_bundle(CombatStatsBundle {
+            health: Health::new(20),
+            attack: Attack::new(1, 6),
         });
 
     // Spawn monsters
@@ -194,10 +142,12 @@ fn build_map(mut commands: Commands) {
 
 fn collect_tiles(
     mut map: ResMut<Map>,
-    tiles: Query<(Entity, &Position, Option<&BlockMove>, Option<&Opaque>), With<Tile>>,
+    tiles: Query<(Entity, &Position, Option<&BlockMove>, Option<&Opaque>)>,
 ) {
     map.tiles.clear();
-    for (entity, position, _blocks_move, opaque) in tiles.iter() {
+    map.opaque.clear();
+    map.blockers.clear();
+    for (entity, position, blocks_move, opaque) in tiles.iter() {
         map.tiles
             .entry(*position)
             .or_insert(Vec::new())
@@ -205,6 +155,10 @@ fn collect_tiles(
 
         if opaque.is_some() {
             map.opaque.insert(*position);
+        }
+
+        if blocks_move.is_some() {
+            map.blockers.insert(*position);
         }
     }
 }
@@ -220,6 +174,50 @@ impl BaseMap for Map {
         self.idx_position(idx)
             .map(|pos| self.opaque.contains(&pos))
             .unwrap_or(true)
+    }
+
+    fn get_available_exits(&self, idx: usize) -> SmallVec<[(usize, f32); 10]> {
+        let mut exits = SmallVec::new();
+        let x = (idx % self.width) as i32;
+        let y = (idx / self.width) as i32;
+        let w = self.width;
+
+        // Cardinal directions
+        if self.is_exit_valid(x - 1, y) {
+            exits.push((idx - 1, 1.0))
+        };
+        if self.is_exit_valid(x + 1, y) {
+            exits.push((idx + 1, 1.0))
+        };
+        if self.is_exit_valid(x, y - 1) {
+            exits.push((idx - w, 1.0))
+        };
+        if self.is_exit_valid(x, y + 1) {
+            exits.push((idx + w, 1.0))
+        };
+
+        // Diagonals
+        if self.is_exit_valid(x - 1, y - 1) {
+            exits.push(((idx - w) - 1, 1.45));
+        }
+        if self.is_exit_valid(x + 1, y - 1) {
+            exits.push(((idx - w) + 1, 1.45));
+        }
+        if self.is_exit_valid(x - 1, y + 1) {
+            exits.push(((idx + w) - 1, 1.45));
+        }
+        if self.is_exit_valid(x + 1, y + 1) {
+            exits.push(((idx + w) + 1, 1.45));
+        }
+
+        exits
+    }
+
+    fn get_pathing_distance(&self, idx1: usize, idx2: usize) -> f32 {
+        let w = self.width as usize;
+        let p1 = Point::new(idx1 % w, idx1 / w);
+        let p2 = Point::new(idx2 % w, idx2 / w);
+        DistanceAlg::Pythagoras.distance2d(p1, p2)
     }
 }
 

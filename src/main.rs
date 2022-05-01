@@ -3,6 +3,7 @@ mod combat;
 mod components;
 mod events;
 mod map;
+mod map_tile;
 mod monster;
 mod player;
 mod states;
@@ -13,8 +14,8 @@ use bevy::prelude::*;
 use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
-use bracket_lib::prelude::field_of_view;
-use combat::{track_dead, Health};
+use bracket_lib::prelude::field_of_view_set;
+use combat::{track_dead, CombatPlugin, Health};
 use events::{AttackEvent, MoveEvent};
 use itertools::Itertools;
 use map::{Map, MapPlugin};
@@ -47,11 +48,12 @@ fn main() {
         .add_plugin(MapPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(MonsterPlugin)
+        .add_plugin(CombatPlugin)
         .add_startup_system(setup_camera)
         .add_system_set(
             SystemSet::on_update(GameState::WaitingInput).with_system(keyboard_handling),
         )
-        .add_system(track_dead)
+        .add_system(track_dead.after(combat::combat))
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility))
@@ -141,19 +143,20 @@ fn keyboard_handling(
             delta.x += 1;
             delta.y -= 1;
         }
-        _ => {}
-    }
-    if delta == Position::default() {
-        return;
+        KeyCode::Numpad5 => {}
+        _ => return,
     }
 
-    for (player, position) in players.iter() {
-        commands.entity(player).insert(WantToMove {
-            position: Position::new(position.x + delta.x, position.y + delta.y),
-        });
+    if delta != Position::default() {
+        for (player, position) in players.iter() {
+            commands.entity(player).insert(WantToMove {
+                position: Position::new(position.x + delta.x, position.y + delta.y),
+            });
+        }
     }
 
-    input.reset(key);
+    // input.reset(key);
+    input.clear();
     states.set(GameState::PlayerTurn).unwrap();
 }
 
@@ -236,7 +239,7 @@ pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed
     for (mut fov, position) in units.iter_mut() {
         fov.visible_tiles.clear();
         fov.visible_tiles =
-            field_of_view(position.into(), fov.range.try_into().unwrap_or(0), &*map)
+            field_of_view_set(position.into(), fov.range.try_into().unwrap_or(0), &*map)
                 .iter()
                 .filter_map(|p| {
                     let pos = p.into();
