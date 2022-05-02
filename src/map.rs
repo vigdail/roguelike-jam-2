@@ -7,7 +7,7 @@ use bracket_lib::prelude::{
 
 use crate::{
     items::health_potion, map_tile::TileType, monster::spawn_monster, player::spawn_player,
-    BlockMove, Opaque, Position,
+    BlockMove, Opaque, Position, MAP_SIZE,
 };
 
 #[allow(dead_code)]
@@ -82,11 +82,12 @@ impl Plugin for MapPlugin {
 }
 
 fn build_map(mut commands: Commands) {
-    let width = 80;
-    let height = 45;
+    let width = MAP_SIZE[0] as usize;
+    let height = MAP_SIZE[1] as usize;
     let mut builder = RoomMapBuilder::new(width, height);
     let map_info = builder.build();
 
+    info!("Map size: {}x{}", map_info.width, map_info.height);
     let map = Map::new(map_info.width, map_info.height);
     commands.insert_resource(map);
 

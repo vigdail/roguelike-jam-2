@@ -14,7 +14,7 @@ mod utils;
 
 use crate::components::*;
 use bevy::prelude::*;
-use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
+use bevy_ascii_terminal::{Pivot, StringFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
@@ -33,6 +33,9 @@ const LAYER_MAP: u32 = 0;
 const LAYER_ITEM: u32 = 2;
 const LAYER_MONSTER: u32 = 3;
 const LAYER_PLAYER: u32 = 4;
+
+const WINDOW_SIZE: [u32; 2] = [80, 45];
+const MAP_SIZE: [u32; 2] = [WINDOW_SIZE[0], WINDOW_SIZE[1] - 7];
 
 fn main() {
     App::new()
@@ -65,12 +68,12 @@ fn main() {
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility).label("render_map"))
+        .add_system(render_status_bar.after("render_map"))
         .run();
 }
 
 fn setup_camera(mut commands: Commands) {
-    let size = [80, 45];
-    let term_bundle = TerminalBundle::new().with_size(size);
+    let term_bundle = TerminalBundle::new().with_size(WINDOW_SIZE);
 
     commands.spawn_bundle(term_bundle).insert(MapViewTerminal);
 
@@ -78,7 +81,7 @@ fn setup_camera(mut commands: Commands) {
         TiledCameraBundle::new()
             .with_centered(true)
             .with_pixels_per_tile(8)
-            .with_tile_count(size),
+            .with_tile_count(WINDOW_SIZE),
     );
 }
 
@@ -109,8 +112,8 @@ fn render_map(
         });
 
     for (tile, position) in sorted_tiles {
-        if terminal.is_in_bounds([position.x, position.y]) {
-            terminal.put_tile([position.x, position.y], tile);
+        if terminal.is_in_bounds([position.x, position.y + 5]) {
+            terminal.put_tile([position.x, position.y + 5], tile);
         }
     }
 }
@@ -268,5 +271,26 @@ pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed
                     }
                 })
                 .collect();
+    }
+}
+
+fn render_status_bar(mut terminal: Query<&mut Terminal>, player: Query<&Health, With<Player>>) {
+    if let Ok(mut terminal) = terminal.get_single_mut() {
+        terminal.draw_box_double([0, 0], [80, 6]);
+        if let Ok(health) = player.get_single() {
+            terminal.put_string_formatted(
+                [53, 5],
+                &format!("HP: {}/{}", health.current, health.max),
+                StringFormat::new(Pivot::BottomRight, Color::YELLOW, Color::NONE),
+            );
+            terminal.draw_horizontal_bar_color(
+                [29, 5],
+                50,
+                health.current as i32,
+                health.max as i32,
+                Color::RED,
+                Color::BLACK,
+            );
+        }
     }
 }
