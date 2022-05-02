@@ -5,8 +5,8 @@ mod events;
 mod map;
 mod map_tile;
 mod monster;
-mod player;
-mod states;
+mod resources;
+mod turn;
 mod utils;
 
 use crate::components::*;
@@ -15,13 +15,13 @@ use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
-use combat::{track_dead, CombatPlugin, Health};
+use combat::{CombatPlugin, Health};
 use events::{AttackEvent, MoveEvent};
 use itertools::Itertools;
 use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
-use player::PlayerPlugin;
-use states::GameState;
+use resources::{CurrentTurn, GameState};
+use turn::TurnPlugin;
 use utils::Grayscale;
 
 const LAYER_MAP: u32 = 0;
@@ -41,19 +41,19 @@ fn main() {
             ..default()
         })
         .insert_resource(ClearColor(Color::BLACK))
+        .insert_resource(CurrentTurn::Player)
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(TerminalPlugin)
         .add_plugin(TiledCameraPlugin)
         .add_plugin(MapPlugin)
-        .add_plugin(PlayerPlugin)
+        .add_plugin(TurnPlugin)
         .add_plugin(MonsterPlugin)
         .add_plugin(CombatPlugin)
         .add_startup_system(setup_camera)
         .add_system_set(
             SystemSet::on_update(GameState::WaitingInput).with_system(keyboard_handling),
         )
-        .add_system(track_dead.after(combat::combat))
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility))
@@ -157,7 +157,7 @@ fn keyboard_handling(
 
     // input.reset(key);
     input.clear();
-    states.set(GameState::PlayerTurn).unwrap();
+    states.set(GameState::Turn).unwrap();
 }
 
 pub fn handle_want_to_move(

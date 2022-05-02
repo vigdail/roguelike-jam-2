@@ -5,12 +5,11 @@ use bracket_lib::prelude::{
 };
 
 use crate::{
-    combat::{combat, Attack, CombatStatsBundle, Health},
+    combat::{Attack, CombatStatsBundle, Health},
     components::{BlockMove, Player, WantToMove},
-    handle_want_to_move,
     map::Map,
-    movement,
-    states::GameState,
+    resources::GameState,
+    turn::end_turn,
     Layer, Position, Unrevealable, LAYER_MONSTER,
 };
 
@@ -22,12 +21,9 @@ pub struct MonsterPlugin;
 impl Plugin for MonsterPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(
-            SystemSet::on_enter(GameState::MonsterTurn)
+            SystemSet::on_enter(GameState::MonsterAi)
                 .with_system(monster_ai)
-                .with_system(handle_want_to_move.after(monster_ai))
-                .with_system(combat.after(handle_want_to_move))
-                .with_system(movement.after(combat))
-                .with_system(end_turn.after(movement)),
+                .with_system(end_turn.after(monster_ai)),
         );
     }
 }
@@ -63,7 +59,7 @@ pub fn monster_ai(
     mut commands: Commands,
     map: Res<Map>,
     players: Query<&Position, With<Player>>,
-    monsters: Query<(Entity, &Position, &Name), With<Monster>>,
+    monsters: Query<(Entity, &Position), With<Monster>>,
 ) {
     let player_pos = players.get_single();
     if player_pos.is_err() {
@@ -71,7 +67,7 @@ pub fn monster_ai(
     }
     let player_pos = player_pos.unwrap();
     let vision_distance_squared = 36.0; // TODO
-    for (monster_entity, monster_pos, monster_name) in monsters.iter() {
+    for (monster_entity, monster_pos) in monsters.iter() {
         let player_pos = player_pos.into();
         let monster_pos = monster_pos.into();
         if DistanceAlg::PythagorasSquared.distance2d(player_pos, monster_pos)
@@ -84,18 +80,12 @@ pub fn monster_ai(
             continue;
         }
 
-        info!("{} sees the Player", monster_name);
         let path = a_star_search(
             map.point2d_to_index(monster_pos) as i32,
             map.point2d_to_index(player_pos) as i32,
             &*map,
         );
-        info!(
-            "{}'s path {:?}, player_pos: {}",
-            monster_name,
-            path.steps,
-            map.point2d_to_index(player_pos)
-        );
+
         if path.success && path.steps.len() > 1 {
             if let Some(position) = map.idx_position(path.steps[1]) {
                 commands
@@ -104,8 +94,4 @@ pub fn monster_ai(
             }
         }
     }
-}
-
-pub fn end_turn(mut states: ResMut<State<GameState>>) {
-    states.set(GameState::WaitingInput).unwrap();
 }
