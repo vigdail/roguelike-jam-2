@@ -1,5 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
-use bevy_ascii_terminal::Terminal;
+use bevy_ascii_terminal::{CharFormat, StringFormat, Terminal};
 
 use crate::{
     components::{MapViewTerminal, Player},
@@ -89,14 +89,30 @@ fn render_inventory(
 
     terminal.clear_box([x, y], [width as u32, height as u32]);
     terminal.draw_box_double([x, y], [width as u32, height as u32]);
-    terminal.put_string([x + 3, y + height - 1], "Inventory");
+    terminal.put_string_formatted(
+        [x + 3, y + height - 1],
+        "Inventory",
+        StringFormat::colors(Color::YELLOW, Color::NONE),
+    );
+    terminal.put_string_formatted(
+        [x + 3, y],
+        "ESCAPE to cancel",
+        StringFormat::colors(Color::YELLOW, Color::NONE),
+    );
+
     for (i, (letter, name)) in ('a'..'z')
         .zip(backpack.iter().map(|(_, name)| name))
         .enumerate()
     {
         let x = x + 2;
         let y = y + height - i as i32 - 3;
-        terminal.put_string([x, y], &format!("({}): {}", letter, name));
+        terminal.put_char([x, y], '(');
+        terminal.put_char_formatted(
+            [x + 1, y],
+            letter,
+            CharFormat::new(Color::YELLOW, Color::NONE),
+        );
+        terminal.put_string([x + 2, y], &format!("): {}", name));
     }
 
     ('a'..'z')
