@@ -4,15 +4,53 @@ use bracket_lib::prelude::RandomNumberGenerator;
 
 use crate::events::AttackEvent;
 
+#[derive(Clone, Copy, Inspectable)]
+pub struct Dice {
+    count: i32,
+    sides: i32,
+    modifier: i32,
+}
+
+impl Dice {
+    pub fn roll(&self, rng: &mut RandomNumberGenerator) -> i32 {
+        let result = rng.roll_dice(self.count, self.sides) + self.modifier;
+        result.max(0)
+    }
+}
+
+impl<T> From<(T, T, T)> for Dice
+where
+    T: Into<i32>,
+{
+    fn from((count, sides, modifier): (T, T, T)) -> Self {
+        let count = count.into();
+        let sides = sides.into();
+        let modifier = modifier.into();
+        Self {
+            count,
+            sides,
+            modifier,
+        }
+    }
+}
+
+impl<T> From<(T, T)> for Dice
+where
+    T: Into<i32>,
+{
+    fn from((count, sides): (T, T)) -> Self {
+        Self::from((count.into(), sides.into(), 0i32))
+    }
+}
+
 #[derive(Component, Clone, Copy, Inspectable)]
 pub struct Attack {
-    dice_count: u8,
-    dice: u8,
+    dice: Dice,
 }
 
 impl Attack {
-    pub fn new(dice_count: u8, dice: u8) -> Self {
-        Self { dice_count, dice }
+    pub fn new<T: Into<Dice>>(dice: T) -> Self {
+        Self { dice: dice.into() }
     }
 }
 
@@ -66,7 +104,7 @@ pub fn combat(
 
         if let Some((mut victim_health, victim_name)) = victim {
             let damage = attacker
-                .map(|(_, attack)| rng.roll_dice(attack.dice_count as i32, attack.dice as i32))
+                .map(|(_, attack)| attack.dice.roll(&mut rng))
                 .unwrap_or(0);
 
             let attacker_name = attacker.map(|(name, _)| name).cloned().unwrap_or_default();

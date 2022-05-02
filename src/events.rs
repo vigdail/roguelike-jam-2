@@ -11,3 +11,11 @@ pub struct MoveEvent {
     pub entity: Entity,
     pub position: Position,
 }
+
+#[derive(Component)]
+pub struct WantPickup;
+
+pub struct PickupEvent {
+    pub collected_by: Entity,
+    pub item: Entity,
+}

@@ -79,3 +79,12 @@ pub struct Fov {
     pub visible_tiles: HashSet<Position>,
     pub range: u32,
 }
+
+impl Fov {
+    pub fn new(range: u32) -> Self {
+        Self {
+            visible_tiles: HashSet::new(),
+            range,
+        }
+    }
+}

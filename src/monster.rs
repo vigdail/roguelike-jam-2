@@ -28,12 +28,12 @@ impl Plugin for MonsterPlugin {
     }
 }
 
-pub fn spawn_monster(commands: &mut Commands, position: &Position) -> Entity {
+pub fn spawn_monster(commands: &mut Commands, position: Position) -> Entity {
     let mut rng = RandomNumberGenerator::new();
     let roll = rng.roll_dice(1, 6);
     let (glyph, name, attack) = match roll {
-        1 => ('o', "Orc", Attack::new(1, 6)),
-        _ => ('g', "Goblin", Attack::new(1, 4)),
+        1 => ('o', "Orc", Attack::new((1, 6))),
+        _ => ('g', "Goblin", Attack::new((1, 4))),
     };
     commands
         .spawn()
@@ -43,7 +43,7 @@ pub fn spawn_monster(commands: &mut Commands, position: &Position) -> Entity {
             bg_color: Color::BLACK,
         })
         .insert(Monster)
-        .insert(*position)
+        .insert(position)
         .insert(Layer(LAYER_MONSTER))
         .insert(Unrevealable)
         .insert(Name::new(name))

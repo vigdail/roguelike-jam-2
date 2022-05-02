@@ -35,13 +35,14 @@ pub fn end_turn(
         GameState::WaitingInput => GameState::Turn,
         GameState::MonsterAi => GameState::Turn,
         GameState::Turn => {
-            let n = match *turn {
+            let next = match *turn {
                 CurrentTurn::Player => GameState::MonsterAi,
                 CurrentTurn::Monster => GameState::WaitingInput,
             };
             turn.change();
-            n
+            next
         }
+        _ => return,
     };
 
     next_state.0 = Some(next);

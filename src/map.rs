@@ -1,16 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
-use bevy_ascii_terminal::Tile;
 use bracket_lib::prelude::{
     Algorithm2D, BaseMap, DistanceAlg, Point, RandomNumberGenerator, Rect, SmallVec,
 };
 
 use crate::{
-    combat::{Attack, CombatStatsBundle, Health},
-    map_tile::TileType,
-    monster::spawn_monster,
-    BlockMove, Fov, Layer, Opaque, Player, Position, LAYER_PLAYER,
+    items::health_potion, map_tile::TileType, monster::spawn_monster, player::spawn_player,
+    BlockMove, Opaque, Position,
 };
 
 #[allow(dead_code)]
@@ -110,34 +107,58 @@ fn build_map(mut commands: Commands) {
         .push_children(&tile_entities)
         .insert(Name::new("Map"));
 
-    // Spawn player
-    commands
-        .spawn()
-        .insert(Player)
-        .insert(Tile {
-            glyph: '@',
-            fg_color: Color::WHITE,
-            bg_color: Color::rgba(1.0, 1.0, 1.0, 0.0),
-        })
-        .insert(Position::from(
-            map_info.player_start.unwrap_or_else(Point::zero),
-        ))
-        .insert(Name::new("Player"))
-        .insert(Layer(LAYER_PLAYER))
-        .insert(Fov {
-            visible_tiles: HashSet::new(),
-            range: 8,
-        })
-        .insert_bundle(CombatStatsBundle {
-            health: Health::new(20),
-            attack: Attack::new(1, 6),
-        });
+    spawn_player(
+        &mut commands,
+        map_info.player_start.map(|p| p.into()).unwrap_or_default(),
+    );
 
-    // Spawn monsters
+    health_potion(&mut commands, map_info.player_start.unwrap().into());
+
     map_info.rooms.iter().skip(1).for_each(|room| {
-        let center = room.center();
-        spawn_monster(&mut commands, &center.into());
+        spawn_room(&mut commands, room);
     });
+}
+
+fn spawn_room(commands: &mut Commands, room: &Rect) {
+    let mut spawned = HashMap::new();
+    let mut rng = RandomNumberGenerator::new();
+
+    let num_monsters = rng.roll_dice(1, 3) - 1;
+    assert!(num_monsters >= 0);
+    for _ in 0..num_monsters {
+        let mut added = false;
+        while !added {
+            let x = rng.range(room.x1 + 1, room.x2 - 1) as usize;
+            let y = rng.range(room.y1 + 1, room.y2 - 1) as usize;
+            if spawned.get(&(x, y)).is_none() {
+                spawned.insert((x, y), "monster");
+                added = true;
+            }
+        }
+    }
+
+    let num_items = rng.roll_dice(1, 2) - 1;
+    assert!(num_items >= 0);
+    for _ in 0..num_items {
+        let mut added = false;
+        while !added {
+            let x = rng.range(room.x1 + 1, room.x2 - 1) as usize;
+            let y = rng.range(room.y1 + 1, room.y2 - 1) as usize;
+            if spawned.get(&(x, y)).is_none() {
+                spawned.insert((x, y), "item");
+                added = true;
+            }
+        }
+    }
+
+    for ((x, y), name) in spawned {
+        let position = Position::new(x, y);
+        match name {
+            "monster" => spawn_monster(commands, position),
+            "item" => health_potion(commands, position),
+            _ => unreachable!(),
+        };
+    }
 }
 
 fn collect_tiles(

@@ -3,6 +3,7 @@ pub enum GameState {
     WaitingInput,
     MonsterAi,
     Turn,
+    Inventory,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

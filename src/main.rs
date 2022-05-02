@@ -2,9 +2,12 @@
 mod combat;
 mod components;
 mod events;
+mod inventory;
+mod items;
 mod map;
 mod map_tile;
 mod monster;
+mod player;
 mod resources;
 mod turn;
 mod utils;
@@ -16,7 +19,9 @@ use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
 use combat::{CombatPlugin, Health};
-use events::{AttackEvent, MoveEvent};
+use events::{AttackEvent, MoveEvent, WantPickup};
+use inventory::InventoryPlugin;
+use items::ItemPlugin;
 use itertools::Itertools;
 use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
@@ -25,6 +30,7 @@ use turn::TurnPlugin;
 use utils::Grayscale;
 
 const LAYER_MAP: u32 = 0;
+const LAYER_ITEM: u32 = 2;
 const LAYER_MONSTER: u32 = 3;
 const LAYER_PLAYER: u32 = 4;
 
@@ -47,24 +53,24 @@ fn main() {
         .add_plugin(TerminalPlugin)
         .add_plugin(TiledCameraPlugin)
         .add_plugin(MapPlugin)
+        .add_plugin(ItemPlugin)
         .add_plugin(TurnPlugin)
         .add_plugin(MonsterPlugin)
         .add_plugin(CombatPlugin)
+        .add_plugin(InventoryPlugin)
         .add_startup_system(setup_camera)
         .add_system_set(
             SystemSet::on_update(GameState::WaitingInput).with_system(keyboard_handling),
         )
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
-        .add_system(render_map.after(update_visibility))
+        .add_system(render_map.after(update_visibility).label("render_map"))
         .run();
 }
 
 fn setup_camera(mut commands: Commands) {
     let size = [80, 45];
-    let mut term_bundle = TerminalBundle::new().with_size(size);
-
-    term_bundle.terminal.draw_border_single();
+    let term_bundle = TerminalBundle::new().with_size(size);
 
     commands.spawn_bundle(term_bundle).insert(MapViewTerminal);
 
@@ -115,6 +121,13 @@ fn keyboard_handling(
     mut states: ResMut<State<GameState>>,
     players: Query<(Entity, &Position), With<Player>>,
 ) {
+    let players = players.get_single();
+    if players.is_err() {
+        return;
+    }
+
+    let (player, &player_pos) = players.unwrap();
+
     let just_pressed = input.get_just_pressed().next();
     if just_pressed.is_none() {
         return;
@@ -144,18 +157,23 @@ fn keyboard_handling(
             delta.y -= 1;
         }
         KeyCode::Numpad5 => {}
+        KeyCode::G => {
+            commands.entity(player).insert(WantPickup);
+        }
+        KeyCode::I => {
+            input.clear();
+            states.push(GameState::Inventory).unwrap();
+            return;
+        }
         _ => return,
     }
 
     if delta != Position::default() {
-        for (player, position) in players.iter() {
-            commands.entity(player).insert(WantToMove {
-                position: Position::new(position.x + delta.x, position.y + delta.y),
-            });
-        }
+        commands.entity(player).insert(WantToMove {
+            position: Position::new(player_pos.x + delta.x, player_pos.y + delta.y),
+        });
     }
 
-    // input.reset(key);
     input.clear();
     states.set(GameState::Turn).unwrap();
 }
