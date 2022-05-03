@@ -5,6 +5,7 @@ use crate::{
     combat::Health,
     components::{Layer, Position, Unrevealable},
     events::{PickupEvent, WantPickup},
+    log::GameLog,
     map::Map,
     resources::GameState,
     LAYER_ITEM,
@@ -82,6 +83,7 @@ pub fn handle_want_pickup(
 
 pub fn handle_pickup(
     mut commands: Commands,
+    mut game_log: ResMut<GameLog>,
     mut events: EventReader<PickupEvent>,
     names: Query<&Name>,
 ) {
@@ -95,12 +97,13 @@ pub fn handle_pickup(
 
         let collector_name = names.get(event.collected_by).cloned().unwrap_or_default();
         let item_name = names.get(event.item).cloned().unwrap_or_default();
-        info!("{} pickups {}", collector_name, item_name);
+        game_log.push(format!("{} pickups {}", collector_name, item_name));
     }
 }
 
 fn handle_use_item(
     mut commands: Commands,
+    mut game_log: ResMut<GameLog>,
     mut to_use: Query<(Entity, &WantUseItem, &Name, Option<&mut Health>)>,
     items: Query<&Potion>,
 ) {
@@ -108,10 +111,10 @@ fn handle_use_item(
         if let Some((potion, mut health)) = items.get(to_use.item).ok().zip(health) {
             health.current = health.max.min(health.current + potion.heal_amount);
             commands.entity(to_use.item).remove::<InBackpack>();
-            info!(
+            game_log.push(format!(
                 "{} drinks potion, restores: {} hp",
                 name, potion.heal_amount
-            );
+            ));
         }
 
         commands.entity(entity).remove::<WantUseItem>();

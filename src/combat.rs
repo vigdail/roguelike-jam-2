@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use bracket_lib::prelude::RandomNumberGenerator;
 
-use crate::events::AttackEvent;
+use crate::{events::AttackEvent, log::GameLog};
 
 #[derive(Clone, Copy, Inspectable)]
 pub struct Dice {
@@ -93,6 +93,7 @@ impl Plugin for CombatPlugin {
 }
 
 pub fn combat(
+    mut game_log: ResMut<GameLog>,
     mut attack_events: EventReader<AttackEvent>,
     attackers: Query<(&Name, &Attack)>,
     mut victims: Query<(&mut Health, Option<&Name>)>,
@@ -111,24 +112,25 @@ pub fn combat(
 
             victim_health.take_damage(damage);
             let victim_name = victim_name.cloned().unwrap_or_else(|| Name::new("Unknown"));
-            info!(
+            game_log.push(format!(
                 "{} attacks {} with {} damage",
                 attacker_name, victim_name, damage
-            );
+            ));
         }
     }
 }
 
 pub fn track_dead(
+    mut game_log: ResMut<GameLog>,
     mut commands: Commands,
     actors: Query<(Entity, &Health, Option<&Name>), Changed<Health>>,
 ) {
     for (entity, health, name) in actors.iter() {
         if health.is_dead() {
-            info!(
+            game_log.push(format!(
                 "{} died",
                 name.cloned().unwrap_or_else(|| Name::new("Unknown"))
-            );
+            ));
             commands.entity(entity).despawn_recursive();
         }
     }

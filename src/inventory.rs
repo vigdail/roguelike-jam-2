@@ -12,13 +12,7 @@ pub struct InventoryPlugin;
 
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(SystemSet::on_enter(GameState::Inventory).with_system(|| {
-            info!("Inventory state");
-        }))
-        .add_system_set(SystemSet::on_exit(GameState::Inventory).with_system(|| {
-            info!("Leave inventory state");
-        }))
-        .add_system_set(
+        app.add_system_set(
             SystemSet::on_update(GameState::Inventory)
                 .with_system(render_inventory.chain(handle_input).after("render_map")),
         );

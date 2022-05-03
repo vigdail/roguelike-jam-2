@@ -4,6 +4,7 @@ mod components;
 mod events;
 mod inventory;
 mod items;
+mod log;
 mod map;
 mod map_tile;
 mod monster;
@@ -23,6 +24,7 @@ use events::{AttackEvent, MoveEvent, WantPickup};
 use inventory::InventoryPlugin;
 use items::ItemPlugin;
 use itertools::Itertools;
+use log::GameLog;
 use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
 use resources::{CurrentTurn, GameState};
@@ -35,7 +37,7 @@ const LAYER_MONSTER: u32 = 3;
 const LAYER_PLAYER: u32 = 4;
 
 const WINDOW_SIZE: [u32; 2] = [80, 45];
-const MAP_SIZE: [u32; 2] = [WINDOW_SIZE[0], WINDOW_SIZE[1] - 7];
+const MAP_SIZE: [u32; 2] = [WINDOW_SIZE[0], WINDOW_SIZE[1] - 6];
 
 fn main() {
     App::new()
@@ -49,6 +51,7 @@ fn main() {
             resizable: false,
             ..default()
         })
+        .init_resource::<GameLog>()
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(CurrentTurn::Player)
         .add_plugins(DefaultPlugins)
@@ -112,8 +115,8 @@ fn render_map(
         });
 
     for (tile, position) in sorted_tiles {
-        if terminal.is_in_bounds([position.x, position.y + 5]) {
-            terminal.put_tile([position.x, position.y + 5], tile);
+        if terminal.is_in_bounds([position.x, position.y + 6]) {
+            terminal.put_tile([position.x, position.y + 6], tile);
         }
     }
 }
@@ -274,7 +277,11 @@ pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed
     }
 }
 
-fn render_status_bar(mut terminal: Query<&mut Terminal>, player: Query<&Health, With<Player>>) {
+fn render_status_bar(
+    mut terminal: Query<&mut Terminal>,
+    player: Query<&Health, With<Player>>,
+    game_log: Res<GameLog>,
+) {
     if let Ok(mut terminal) = terminal.get_single_mut() {
         terminal.draw_box_double([0, 0], [80, 6]);
         if let Ok(health) = player.get_single() {
@@ -292,5 +299,16 @@ fn render_status_bar(mut terminal: Query<&mut Terminal>, player: Query<&Health, 
                 Color::BLACK,
             );
         }
+
+        game_log
+            .entries()
+            .iter()
+            .rev()
+            .take(4)
+            .rev()
+            .enumerate()
+            .for_each(|(i, log)| {
+                terminal.put_string([2, 4 - i as i32], log);
+            });
     }
 }

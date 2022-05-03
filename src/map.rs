@@ -87,7 +87,6 @@ fn build_map(mut commands: Commands) {
     let mut builder = RoomMapBuilder::new(width, height);
     let map_info = builder.build();
 
-    info!("Map size: {}x{}", map_info.width, map_info.height);
     let map = Map::new(map_info.width, map_info.height);
     commands.insert_resource(map);
 
