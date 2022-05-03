@@ -6,6 +6,12 @@ use bracket_lib::prelude::Point;
 #[derive(Component)]
 pub struct MapViewTerminal;
 
+#[derive(Component)]
+pub struct LogTerminal;
+
+#[derive(Component)]
+pub struct StatusTerminal;
+
 #[derive(Component, Default, PartialEq, Eq, Clone, Copy, Ord, PartialOrd)]
 pub struct Layer(pub u32);
 

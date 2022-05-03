@@ -23,7 +23,7 @@ impl Default for PlayerBundle {
     fn default() -> Self {
         Self {
             player: Player,
-            name: "You".into(),
+            name: "Player".into(),
             fov: Fov::new(8),
             tile: Tile {
                 glyph: '@',

@@ -16,7 +16,7 @@ mod utils;
 use crate::components::*;
 use bevy::{prelude::*, window::PresentMode};
 use bevy_ascii_terminal::{Pivot, StringFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
-use bevy_inspector_egui::WorldInspectorPlugin;
+use bevy_inspector_egui::{WorldInspectorParams, WorldInspectorPlugin};
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
 use combat::{CombatPlugin, Health};
@@ -77,15 +77,50 @@ fn main() {
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility).label("render_map"))
-        .add_system(render_status_panel.after("render_map"))
-        .add_system(render_log_panel.after("render_map"))
+        .add_system(render_status_panel)
+        .add_system(render_log_panel)
+        .add_system(toggle_inspector)
         .run();
 }
 
-fn setup_camera(mut commands: Commands) {
-    let term_bundle = TerminalBundle::new().with_size(WINDOW_SIZE);
+fn toggle_inspector(
+    input: ResMut<Input<KeyCode>>,
+    mut inspector_params: ResMut<WorldInspectorParams>,
+) {
+    if input.just_pressed(KeyCode::Space) {
+        inspector_params.enabled = !inspector_params.enabled;
+    }
+}
 
-    commands.spawn_bundle(term_bundle).insert(MapViewTerminal);
+fn setup_camera(mut commands: Commands) {
+    let mut map_terminal = TerminalBundle::new().with_size(MAP_SIZE);
+    map_terminal.renderer.terminal_pivot.0 = Vec2::new(1.0, 1.0);
+    map_terminal.transform.translation = Vec3::new(
+        WINDOW_SIZE[0] as f32 / 2.0,
+        WINDOW_SIZE[1] as f32 / 2.0,
+        0.0,
+    );
+    commands.spawn_bundle(map_terminal).insert(MapViewTerminal);
+
+    let mut status_terminal = TerminalBundle::new().with_size(STATUS_PANEL_SIZE);
+    status_terminal.renderer.terminal_pivot.0 = Vec2::new(0.0, 1.0);
+    status_terminal.transform.translation = Vec3::new(
+        WINDOW_SIZE[0] as f32 / -2.0,
+        WINDOW_SIZE[1] as f32 / 2.0,
+        0.0,
+    );
+    commands
+        .spawn_bundle(status_terminal)
+        .insert(StatusTerminal);
+
+    let mut logs_terminal = TerminalBundle::new().with_size(LOG_PANEL_SIZE);
+    logs_terminal.renderer.terminal_pivot.0 = Vec2::new(0.0, 0.0);
+    logs_terminal.transform.translation = Vec3::new(
+        WINDOW_SIZE[0] as f32 / -2.0,
+        WINDOW_SIZE[1] as f32 / -2.0,
+        0.0,
+    );
+    commands.spawn_bundle(logs_terminal).insert(LogTerminal);
 
     commands.spawn_bundle(
         TiledCameraBundle::new()
@@ -122,17 +157,8 @@ fn render_map(
         });
 
     for (tile, position) in sorted_tiles {
-        if terminal.is_in_bounds([
-            position.x + STATUS_PANEL_SIZE[0] as i32,
-            position.y + LOG_PANEL_SIZE[1] as i32,
-        ]) {
-            terminal.put_tile(
-                [
-                    position.x + STATUS_PANEL_SIZE[0] as i32,
-                    position.y + LOG_PANEL_SIZE[1] as i32,
-                ],
-                tile,
-            );
+        if terminal.is_in_bounds([position.x, position.y]) {
+            terminal.put_tile([position.x, position.y], tile);
         }
     }
 }
@@ -293,9 +319,13 @@ pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed
     }
 }
 
-fn render_status_panel(mut terminal: Query<&mut Terminal>, player: Query<&Health, With<Player>>) {
+fn render_status_panel(
+    mut terminal: Query<&mut Terminal, With<StatusTerminal>>,
+    player: Query<&Health, With<Player>>,
+) {
     if let Ok(mut terminal) = terminal.get_single_mut() {
-        terminal.draw_box_single([0, LOG_PANEL_SIZE[1] as i32], STATUS_PANEL_SIZE);
+        terminal.clear();
+        terminal.draw_box_single([0, 0], STATUS_PANEL_SIZE);
         if let Ok(health) = player.get_single() {
             let x = 0;
             terminal.put_string_formatted(
@@ -304,7 +334,7 @@ fn render_status_panel(mut terminal: Query<&mut Terminal>, player: Query<&Health
                 StringFormat::new(Pivot::TopLeft, Color::YELLOW, Color::NONE),
             );
             terminal.draw_horizontal_bar_color(
-                [x + 1, STATUS_PANEL_SIZE[1] as i32 + 2],
+                [x + 1, STATUS_PANEL_SIZE[1] as i32 - 4],
                 STATUS_PANEL_SIZE[0] as i32 - 2,
                 health.current as i32,
                 health.max as i32,
@@ -315,8 +345,9 @@ fn render_status_panel(mut terminal: Query<&mut Terminal>, player: Query<&Health
     }
 }
 
-fn render_log_panel(mut terminal: Query<&mut Terminal>, game_log: Res<GameLog>) {
+fn render_log_panel(mut terminal: Query<&mut Terminal, With<LogTerminal>>, game_log: Res<GameLog>) {
     if let Ok(mut terminal) = terminal.get_single_mut() {
+        terminal.clear();
         terminal.draw_box_single([0, 0], LOG_PANEL_SIZE);
 
         let count = (LOG_PANEL_SIZE[1] - 2) as usize;
