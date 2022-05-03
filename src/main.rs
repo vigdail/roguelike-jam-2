@@ -14,7 +14,7 @@ mod turn;
 mod utils;
 
 use crate::components::*;
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PresentMode};
 use bevy_ascii_terminal::{Pivot, StringFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
@@ -37,7 +37,12 @@ const LAYER_MONSTER: u32 = 3;
 const LAYER_PLAYER: u32 = 4;
 
 const WINDOW_SIZE: [u32; 2] = [80, 45];
-const MAP_SIZE: [u32; 2] = [WINDOW_SIZE[0], WINDOW_SIZE[1] - 6];
+const LOG_PANEL_SIZE: [u32; 2] = [80, 6];
+const STATUS_PANEL_SIZE: [u32; 2] = [14, WINDOW_SIZE[1] - LOG_PANEL_SIZE[1]];
+const MAP_SIZE: [u32; 2] = [
+    WINDOW_SIZE[0] - STATUS_PANEL_SIZE[0],
+    WINDOW_SIZE[1] - LOG_PANEL_SIZE[1],
+];
 
 fn main() {
     App::new()
@@ -49,6 +54,7 @@ fn main() {
             height: 720.0,
             title: "Roguelike".to_string(),
             resizable: false,
+            present_mode: PresentMode::Mailbox,
             ..default()
         })
         .init_resource::<GameLog>()
@@ -71,7 +77,8 @@ fn main() {
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility).label("render_map"))
-        .add_system(render_status_bar.after("render_map"))
+        .add_system(render_status_panel.after("render_map"))
+        .add_system(render_log_panel.after("render_map"))
         .run();
 }
 
@@ -115,8 +122,17 @@ fn render_map(
         });
 
     for (tile, position) in sorted_tiles {
-        if terminal.is_in_bounds([position.x, position.y + 6]) {
-            terminal.put_tile([position.x, position.y + 6], tile);
+        if terminal.is_in_bounds([
+            position.x + STATUS_PANEL_SIZE[0] as i32,
+            position.y + LOG_PANEL_SIZE[1] as i32,
+        ]) {
+            terminal.put_tile(
+                [
+                    position.x + STATUS_PANEL_SIZE[0] as i32,
+                    position.y + LOG_PANEL_SIZE[1] as i32,
+                ],
+                tile,
+            );
         }
     }
 }
@@ -277,38 +293,42 @@ pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed
     }
 }
 
-fn render_status_bar(
-    mut terminal: Query<&mut Terminal>,
-    player: Query<&Health, With<Player>>,
-    game_log: Res<GameLog>,
-) {
+fn render_status_panel(mut terminal: Query<&mut Terminal>, player: Query<&Health, With<Player>>) {
     if let Ok(mut terminal) = terminal.get_single_mut() {
-        terminal.draw_box_double([0, 0], [80, 6]);
+        terminal.draw_box_single([0, LOG_PANEL_SIZE[1] as i32], STATUS_PANEL_SIZE);
         if let Ok(health) = player.get_single() {
+            let x = 0;
             terminal.put_string_formatted(
-                [53, 5],
+                [x + 2, 2],
                 &format!("HP: {}/{}", health.current, health.max),
-                StringFormat::new(Pivot::BottomRight, Color::YELLOW, Color::NONE),
+                StringFormat::new(Pivot::TopLeft, Color::YELLOW, Color::NONE),
             );
             terminal.draw_horizontal_bar_color(
-                [29, 5],
-                50,
+                [x + 1, STATUS_PANEL_SIZE[1] as i32 + 2],
+                STATUS_PANEL_SIZE[0] as i32 - 2,
                 health.current as i32,
                 health.max as i32,
                 Color::RED,
-                Color::BLACK,
+                Color::DARK_GRAY,
             );
         }
+    }
+}
 
+fn render_log_panel(mut terminal: Query<&mut Terminal>, game_log: Res<GameLog>) {
+    if let Ok(mut terminal) = terminal.get_single_mut() {
+        terminal.draw_box_single([0, 0], LOG_PANEL_SIZE);
+
+        let count = (LOG_PANEL_SIZE[1] - 2) as usize;
         game_log
             .entries()
             .iter()
             .rev()
-            .take(4)
+            .take(count)
             .rev()
             .enumerate()
             .for_each(|(i, log)| {
-                terminal.put_string([2, 4 - i as i32], log);
+                terminal.put_string([2, (count - i) as i32], log);
             });
     }
 }
