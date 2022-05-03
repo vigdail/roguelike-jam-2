@@ -6,7 +6,7 @@ use bracket_lib::prelude::{
 
 use crate::{
     combat::{Attack, CombatStatsBundle, Health},
-    components::{BlockMove, Player, WantToMove},
+    components::{Blocker, Player, WantToMove},
     map::Map,
     resources::GameState,
     turn::end_turn,
@@ -15,6 +15,41 @@ use crate::{
 
 #[derive(Component)]
 pub struct Monster;
+
+#[derive(Bundle)]
+pub struct MonsterBundle {
+    pub monster: Monster,
+    pub name: Name,
+    pub unrevealable: Unrevealable,
+    pub blocker: Blocker,
+    pub position: Position,
+    pub tile: Tile,
+    pub layer: Layer,
+    #[bundle]
+    pub combat_stats: CombatStatsBundle,
+}
+
+impl Default for MonsterBundle {
+    fn default() -> Self {
+        Self {
+            monster: Monster,
+            name: "Goblin".into(),
+            unrevealable: Unrevealable,
+            blocker: Blocker,
+            tile: Tile {
+                glyph: 'g',
+                fg_color: Color::RED,
+                bg_color: Color::BLACK,
+            },
+            position: Position::default(),
+            layer: Layer(LAYER_MONSTER),
+            combat_stats: CombatStatsBundle {
+                health: Health::new(10),
+                attack: Attack::new((1, 4)),
+            },
+        }
+    }
+}
 
 pub struct MonsterPlugin;
 
@@ -35,24 +70,22 @@ pub fn spawn_monster(commands: &mut Commands, position: Position) -> Entity {
         1 => ('o', "Orc", Attack::new((1, 6))),
         _ => ('g', "Goblin", Attack::new((1, 4))),
     };
-    commands
-        .spawn()
-        .insert(Tile {
+    let monster = MonsterBundle {
+        monster: Monster,
+        name: name.into(),
+        tile: Tile {
             glyph,
             fg_color: Color::RED,
             bg_color: Color::BLACK,
-        })
-        .insert(Monster)
-        .insert(position)
-        .insert(Layer(LAYER_MONSTER))
-        .insert(Unrevealable)
-        .insert(Name::new(name))
-        .insert(BlockMove)
-        .insert_bundle(CombatStatsBundle {
+        },
+        position,
+        combat_stats: CombatStatsBundle {
             health: Health::new(10),
             attack,
-        })
-        .id()
+        },
+        ..Default::default()
+    };
+    commands.spawn_bundle(monster).id()
 }
 
 pub fn monster_ai(

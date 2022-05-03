@@ -10,7 +10,7 @@ pub struct MapViewTerminal;
 pub struct Layer(pub u32);
 
 #[derive(Component, Clone, Copy)]
-pub struct BlockMove;
+pub struct Blocker;
 
 #[derive(Component, Clone, Copy)]
 pub struct Opaque;

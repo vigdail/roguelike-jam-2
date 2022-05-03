@@ -206,7 +206,7 @@ pub fn handle_want_to_move(
     mut move_events: EventWriter<MoveEvent>,
     map: Res<Map>,
     actors: Query<(Entity, &WantToMove)>,
-    blocks: Query<Entity, With<BlockMove>>,
+    blocks: Query<Entity, With<Blocker>>,
     victims: Query<Entity, With<Health>>,
 ) {
     for (entity, to_move) in actors.iter() {

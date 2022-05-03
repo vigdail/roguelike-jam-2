@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_ascii_terminal::Tile;
 
 use crate::{
-    components::{BlockMove, Layer, Opaque, Position},
+    components::{Blocker, Layer, Opaque, Position},
     LAYER_MAP,
 };
 
@@ -65,7 +65,7 @@ impl TileType {
             .insert(self.as_name())
             .insert(Layer(LAYER_MAP));
         if self.is_blocking() {
-            entity.insert(BlockMove);
+            entity.insert(Blocker);
         }
         if self.is_opaque() {
             entity.insert(Opaque);

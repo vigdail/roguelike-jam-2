@@ -7,7 +7,7 @@ use bracket_lib::prelude::{
 
 use crate::{
     items::health_potion, map_tile::TileType, monster::spawn_monster, player::spawn_player,
-    BlockMove, Opaque, Position, MAP_SIZE,
+    Blocker, Opaque, Position, MAP_SIZE,
 };
 
 #[allow(dead_code)]
@@ -163,7 +163,7 @@ fn spawn_room(commands: &mut Commands, room: &Rect) {
 
 fn collect_tiles(
     mut map: ResMut<Map>,
-    tiles: Query<(Entity, &Position, Option<&BlockMove>, Option<&Opaque>)>,
+    tiles: Query<(Entity, &Position, Option<&Blocker>, Option<&Opaque>)>,
 ) {
     map.tiles.clear();
     map.opaque.clear();
