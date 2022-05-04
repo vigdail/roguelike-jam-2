@@ -15,7 +15,7 @@ mod utils;
 
 use crate::components::*;
 use bevy::{prelude::*, window::PresentMode};
-use bevy_ascii_terminal::{Pivot, StringFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
+use bevy_ascii_terminal::{CharFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::{WorldInspectorParams, WorldInspectorPlugin};
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
@@ -29,7 +29,7 @@ use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
 use resources::{CurrentTurn, GameState};
 use turn::TurnPlugin;
-use utils::Grayscale;
+use utils::{Grayscale, TitleBarStyle, UiUtils};
 
 const LAYER_MAP: u32 = 0;
 const LAYER_ITEM: u32 = 2;
@@ -38,7 +38,7 @@ const LAYER_PLAYER: u32 = 4;
 
 const WINDOW_SIZE: [u32; 2] = [80, 45];
 const LOG_PANEL_SIZE: [u32; 2] = [80, 6];
-const STATUS_PANEL_SIZE: [u32; 2] = [14, WINDOW_SIZE[1] - LOG_PANEL_SIZE[1]];
+const STATUS_PANEL_SIZE: [u32; 2] = [22, WINDOW_SIZE[1] - LOG_PANEL_SIZE[1]];
 const MAP_SIZE: [u32; 2] = [
     WINDOW_SIZE[0] - STATUS_PANEL_SIZE[0],
     WINDOW_SIZE[1] - LOG_PANEL_SIZE[1],
@@ -328,18 +328,16 @@ fn render_status_panel(
         terminal.draw_box_single([0, 0], STATUS_PANEL_SIZE);
         if let Ok(health) = player.get_single() {
             let x = 0;
-            terminal.put_string_formatted(
-                [x + 2, 2],
-                &format!("HP: {}/{}", health.current, health.max),
-                StringFormat::new(Pivot::TopLeft, Color::YELLOW, Color::NONE),
-            );
-            terminal.draw_horizontal_bar_color(
+            terminal.draw_titled_bar(
                 [x + 1, STATUS_PANEL_SIZE[1] as i32 - 4],
-                STATUS_PANEL_SIZE[0] as i32 - 2,
+                &format!("HP: {}/{}", health.current, health.max),
                 health.current as i32,
                 health.max as i32,
-                Color::RED,
-                Color::DARK_GRAY,
+                TitleBarStyle {
+                    width: STATUS_PANEL_SIZE[0] as usize - 2,
+                    filled: CharFormat::new(Color::WHITE, Color::RED),
+                    empty: CharFormat::new(Color::WHITE, Color::MAROON),
+                },
             );
         }
     }
