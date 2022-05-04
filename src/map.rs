@@ -2,7 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 use bracket_lib::prelude::{
-    Algorithm2D, BaseMap, DistanceAlg, Point, RandomNumberGenerator, Rect, SmallVec,
+    Algorithm2D, BaseMap, DistanceAlg, FastNoise, FractalType, NoiseType, Point,
+    RandomNumberGenerator, Rect, SmallVec,
 };
 
 use crate::{
@@ -354,12 +355,33 @@ impl RoomMapBuilder {
     }
 
     fn apply_room(&self, map: &mut MapInfo, room: &Rect) {
+        let mut rng = RandomNumberGenerator::new();
+        let mut noise = FastNoise::seeded(rng.next_u64());
+        noise.set_noise_type(NoiseType::PerlinFractal);
+        noise.set_fractal_type(FractalType::FBM);
+        noise.set_fractal_octaves(5);
+        noise.set_fractal_gain(0.6);
+        noise.set_fractal_lacunarity(2.0);
+        noise.set_frequency(8.0);
+
+        let mut max = -10.0f32;
+        let mut min = 10.0f32;
         for x in (room.x1)..room.x2 {
             for y in (room.y1)..room.y2 {
                 let index = y as usize * self.width + x as usize;
-                map.tiles[index] = TileType::Floor;
+                let n =
+                    noise.get_noise(x as f32 / self.width as f32, y as f32 / self.height as f32);
+                max = max.max(n);
+                min = min.min(n);
+                let is_grass = n < 0.0;
+                if is_grass {
+                    map.tiles[index] = TileType::Grass;
+                } else {
+                    map.tiles[index] = TileType::Floor;
+                }
             }
         }
+        println!("Min: {}, Max: {}", min, max);
     }
 }
 

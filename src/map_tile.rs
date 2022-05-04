@@ -10,6 +10,7 @@ use crate::{
 pub enum TileType {
     Wall,
     Floor,
+    Grass,
 }
 
 impl From<TileType> for Tile {
@@ -31,6 +32,11 @@ impl From<&TileType> for Tile {
                 bg_color: Color::BLACK,
                 fg_color: Color::OLIVE,
             },
+            TileType::Grass => Tile {
+                glyph: '"',
+                bg_color: Color::BLACK,
+                fg_color: Color::DARK_GREEN,
+            },
         }
     }
 }
@@ -40,20 +46,21 @@ impl TileType {
         match self {
             TileType::Wall => "Wall".into(),
             TileType::Floor => "Floor".into(),
+            TileType::Grass => "Grass".into(),
         }
     }
 
     pub fn is_blocking(&self) -> bool {
         match self {
             TileType::Wall => true,
-            TileType::Floor => false,
+            TileType::Floor | TileType::Grass => false,
         }
     }
 
     pub fn is_opaque(&self) -> bool {
         match self {
             TileType::Wall => true,
-            TileType::Floor => false,
+            TileType::Floor | TileType::Grass => false,
         }
     }
 
