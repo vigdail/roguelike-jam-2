@@ -151,6 +151,7 @@ fn render_map(
     terminal.clear();
     let sorted_tiles = tiles
         .iter()
+        .filter(|(_, position, _, _, _)| terminal.is_in_bounds([position.x, position.y]))
         .sorted_by(|a, b| a.3.cmp(&b.3))
         .map(|(tile, position, visible, _, under_cursor)| (tile, position, visible, under_cursor))
         .map(|(tile, position, visible, under_cursor)| {
@@ -169,9 +170,7 @@ fn render_map(
         });
 
     for (tile, position) in sorted_tiles {
-        if terminal.is_in_bounds([position.x, position.y]) {
-            terminal.put_tile([position.x, position.y], tile);
-        }
+        terminal.put_tile([position.x, position.y], tile);
     }
 }
 
