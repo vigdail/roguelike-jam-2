@@ -31,7 +31,7 @@ use monster::MonsterPlugin;
 use resources::{CurrentTurn, GameState};
 use side_panel::{render_player_stats, render_visible_entities};
 use turn::TurnPlugin;
-use utils::Grayscale;
+use utils::{cursor_hint, Grayscale};
 
 const LAYER_MAP: u32 = 0;
 const LAYER_ITEM: u32 = 2;
@@ -82,6 +82,7 @@ fn main() {
         .add_system(render_player_stats.chain(render_visible_entities))
         .add_system(render_log_panel)
         .add_system(toggle_inspector)
+        .add_system(cursor_hint)
         .run();
 }
 
