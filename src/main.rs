@@ -31,7 +31,7 @@ use monster::MonsterPlugin;
 use resources::{CurrentTurn, GameState};
 use side_panel::{render_player_stats, render_visible_entities};
 use turn::TurnPlugin;
-use utils::{cursor_hint, Grayscale};
+use utils::{clear_undercursor, cursor_hint, Grayscale, UnderCursor};
 
 const LAYER_MAP: u32 = 0;
 const LAYER_ITEM: u32 = 2;
@@ -82,7 +82,8 @@ fn main() {
         .add_system(render_player_stats.chain(render_visible_entities))
         .add_system(render_log_panel)
         .add_system(toggle_inspector)
-        .add_system(cursor_hint)
+        .add_system_to_stage(CoreStage::First, clear_undercursor)
+        .add_system_to_stage(CoreStage::PreUpdate, cursor_hint)
         .run();
 }
 
@@ -134,24 +135,32 @@ fn setup_camera(mut commands: Commands) {
 }
 
 fn render_map(
-    tiles: Query<(
-        &Tile,
-        &Position,
-        Option<&Revealed>,
-        Option<&Visible>,
-        Option<&Layer>,
-    )>,
+    tiles: Query<
+        (
+            &Tile,
+            &Position,
+            Option<&Visible>,
+            Option<&Layer>,
+            Option<&UnderCursor>,
+        ),
+        Or<(With<Revealed>, With<Visible>)>,
+    >,
     mut terminal: Query<&mut Terminal, With<MapViewTerminal>>,
 ) {
     let mut terminal = terminal.single_mut();
     terminal.clear();
     let sorted_tiles = tiles
         .iter()
-        .filter(|(_, _, revealed, visible, _)| visible.is_some() || revealed.is_some())
-        .sorted_by(|a, b| a.4.cmp(&b.4))
-        .map(|(tile, position, _, visible, _)| (tile, position, visible))
-        .map(|(tile, position, visible)| {
-            let tile = if visible.is_some() {
+        .sorted_by(|a, b| a.3.cmp(&b.3))
+        .map(|(tile, position, visible, _, under_cursor)| (tile, position, visible, under_cursor))
+        .map(|(tile, position, visible, under_cursor)| {
+            let tile = if under_cursor.is_some() {
+                Tile {
+                    glyph: tile.glyph,
+                    fg_color: Color::BLACK,
+                    bg_color: Color::YELLOW,
+                }
+            } else if visible.is_some() {
                 *tile
             } else {
                 tile.grayscale()

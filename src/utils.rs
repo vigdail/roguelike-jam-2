@@ -87,12 +87,21 @@ impl UiUtils for Terminal {
     }
 }
 
+#[derive(Component)]
+pub struct UnderCursor;
+
+pub fn clear_undercursor(mut commands: Commands, entities: Query<Entity, With<UnderCursor>>) {
+    for entity in entities.iter() {
+        commands.entity(entity).remove::<UnderCursor>();
+    }
+}
+
 pub fn cursor_hint(
-    input: Res<Input<MouseButton>>,
+    mut commands: Commands,
     windows: Res<Windows>,
     map: Res<Map>,
     q_camera: Query<(&Camera, &GlobalTransform, &TiledProjection)>,
-    names: Query<(&Name, &Layer), Or<(With<Visible>, With<Revealed>)>>,
+    names: Query<(Entity, &Layer), Or<(With<Visible>, With<Revealed>)>>,
 ) {
     let window = windows.get_primary().unwrap();
 
@@ -103,19 +112,17 @@ pub fn cursor_hint(
                     p.x += WINDOW_SIZE[0] as i32 / 2 - STATUS_PANEL_SIZE[0] as i32;
                     p.y += WINDOW_SIZE[1] as i32 / 2 - LOG_PANEL_SIZE[1] as i32;
                     let position = Position::new(p.x, p.y);
-                    if input.just_pressed(MouseButton::Left) {
-                        if !map.is_in_bounds(&position) {
-                            return;
-                        }
-                        if let Some(name) = map
-                            .at_position(&position)
-                            .into_iter()
-                            .filter_map(|entity| names.get(entity).ok())
-                            .max_by(|a, b| a.1.cmp(b.1))
-                            .map(|(name, _)| name)
-                        {
-                            info!("You see: {}", name);
-                        }
+                    if !map.is_in_bounds(&position) {
+                        return;
+                    }
+                    if let Some(entity) = map
+                        .at_position(&position)
+                        .into_iter()
+                        .filter_map(|entity| names.get(entity).ok())
+                        .max_by(|a, b| a.1.cmp(b.1))
+                        .map(|(name, _)| name)
+                    {
+                        commands.entity(entity).insert(UnderCursor);
                     }
 
                     return;
