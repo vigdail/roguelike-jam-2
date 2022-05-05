@@ -46,6 +46,10 @@ impl Position {
             y: y.try_into().unwrap_or(0),
         }
     }
+
+    pub fn distance_squared(&self, other: &Position) -> i32 {
+        (self.x - other.x).pow(2) + (self.y - other.y).pow(2)
+    }
 }
 
 impl From<Point> for Position {
