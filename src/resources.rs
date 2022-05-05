@@ -4,6 +4,7 @@ pub enum GameState {
     MonsterAi,
     Turn,
     Inventory,
+    DropItemMenu,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

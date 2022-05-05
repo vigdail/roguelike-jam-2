@@ -29,6 +29,11 @@ pub struct WantUseItem {
     pub item: Entity,
 }
 
+#[derive(Component, Debug, Clone)]
+pub struct WantDropItem {
+    pub item: Entity,
+}
+
 pub struct ItemPlugin;
 
 impl Plugin for ItemPlugin {
@@ -37,7 +42,8 @@ impl Plugin for ItemPlugin {
             SystemSet::on_enter(GameState::Turn)
                 .with_system(handle_want_pickup)
                 .with_system(handle_pickup.after(handle_want_pickup))
-                .with_system(handle_use_item),
+                .with_system(handle_use_item)
+                .with_system(handle_drop_item),
         );
     }
 }
@@ -118,5 +124,23 @@ fn handle_use_item(
         }
 
         commands.entity(entity).remove::<WantUseItem>();
+    }
+}
+
+fn handle_drop_item(
+    mut commands: Commands,
+    mut game_log: ResMut<GameLog>,
+    to_drop: Query<(Entity, &Position, &WantDropItem, &Name)>,
+    names: Query<&Name>,
+) {
+    for (entity, position, to_drop, name) in to_drop.iter() {
+        let item_name = names.get(to_drop.item).expect("Item has no name");
+
+        commands
+            .entity(to_drop.item)
+            .remove::<InBackpack>()
+            .insert(*position);
+        commands.entity(entity).remove::<WantDropItem>();
+        game_log.push(format!("{} drops item: {}", name, item_name));
     }
 }

@@ -184,10 +184,10 @@ fn keyboard_handling(
     let key = just_pressed.cloned().unwrap();
     let mut delta = Position::new(0, 0);
     match key {
-        KeyCode::W | KeyCode::Numpad8 | KeyCode::Up => delta.y += 1,
-        KeyCode::S | KeyCode::Numpad2 | KeyCode::Down => delta.y -= 1,
-        KeyCode::A | KeyCode::Numpad4 | KeyCode::Left => delta.x -= 1,
-        KeyCode::D | KeyCode::Numpad6 | KeyCode::Right => delta.x += 1,
+        KeyCode::Numpad8 | KeyCode::Up => delta.y += 1,
+        KeyCode::Numpad2 | KeyCode::Down => delta.y -= 1,
+        KeyCode::Numpad4 | KeyCode::Left => delta.x -= 1,
+        KeyCode::Numpad6 | KeyCode::Right => delta.x += 1,
         KeyCode::Numpad7 => {
             delta.x -= 1;
             delta.y += 1;
@@ -211,6 +211,11 @@ fn keyboard_handling(
         KeyCode::I => {
             input.clear();
             states.push(GameState::Inventory).unwrap();
+            return;
+        }
+        KeyCode::D => {
+            input.clear();
+            states.push(GameState::DropItemMenu).unwrap();
             return;
         }
         _ => return,

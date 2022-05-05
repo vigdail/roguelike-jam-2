@@ -364,15 +364,11 @@ impl RoomMapBuilder {
         noise.set_fractal_lacunarity(2.0);
         noise.set_frequency(8.0);
 
-        let mut max = -10.0f32;
-        let mut min = 10.0f32;
         for x in (room.x1)..room.x2 {
             for y in (room.y1)..room.y2 {
                 let index = y as usize * self.width + x as usize;
                 let n =
                     noise.get_noise(x as f32 / self.width as f32, y as f32 / self.height as f32);
-                max = max.max(n);
-                min = min.min(n);
                 let is_grass = n < 0.0;
                 if is_grass {
                     map.tiles[index] = TileType::Grass;
@@ -381,7 +377,6 @@ impl RoomMapBuilder {
                 }
             }
         }
-        println!("Min: {}, Max: {}", min, max);
     }
 }
 
