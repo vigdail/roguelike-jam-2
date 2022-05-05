@@ -142,7 +142,7 @@ fn spawn_room(commands: &mut Commands, room: &Rect) {
     assert!(num_items >= 0);
     for _ in 0..num_items {
         let mut added = false;
-        while !added {
+        while !added && spawned.len() < (room.width() * room.height()) as usize {
             let x = rng.range(room.x1 + 1, room.x2 - 1) as usize;
             let y = rng.range(room.y1 + 1, room.y2 - 1) as usize;
             if spawned.get(&(x, y)).is_none() {

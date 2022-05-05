@@ -64,7 +64,7 @@ pub fn render_visible_entities(
         .take(max_monsters as usize)
         .collect::<Vec<_>>();
 
-    let max_items = (STATUS_PANEL_SIZE[1] as usize - monsters.len() * 3 - y as usize) * 2;
+    let max_items = (STATUS_PANEL_SIZE[1] as usize - monsters.len() * 3 - 6) / 2;
     let items = visible_entities
         .iter()
         .filter_map(|entity| items.get(*entity).ok())
