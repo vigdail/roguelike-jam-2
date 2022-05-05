@@ -82,8 +82,8 @@ pub fn handle_want_pickup(
                 collected_by: collector,
                 item,
             });
-            commands.entity(collector).remove::<WantPickup>();
         }
+        commands.entity(collector).remove::<WantPickup>();
     }
 }
 

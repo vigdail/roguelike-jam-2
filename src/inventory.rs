@@ -155,7 +155,7 @@ fn render_drop_menu(
         .collect()
 }
 
-fn draw_items_menu(title: &str, backpack: &Vec<(Entity, &Name)>, mut terminal: Mut<Terminal>) {
+fn draw_items_menu(title: &str, backpack: &[(Entity, &Name)], mut terminal: Mut<Terminal>) {
     let item_count = backpack.len() as i32;
     let width = 31;
     let height = 4 + item_count;
