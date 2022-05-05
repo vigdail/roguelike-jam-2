@@ -10,12 +10,13 @@ mod map_tile;
 mod monster;
 mod player;
 mod resources;
+mod side_panel;
 mod turn;
 mod utils;
 
 use crate::components::*;
 use bevy::{prelude::*, window::PresentMode};
-use bevy_ascii_terminal::{CharFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
+use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::{WorldInspectorParams, WorldInspectorPlugin};
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
@@ -28,8 +29,9 @@ use log::GameLog;
 use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
 use resources::{CurrentTurn, GameState};
+use side_panel::{render_player_stats, render_visible_entities};
 use turn::TurnPlugin;
-use utils::{Grayscale, TitleBarStyle, UiUtils};
+use utils::Grayscale;
 
 const LAYER_MAP: u32 = 0;
 const LAYER_ITEM: u32 = 2;
@@ -77,7 +79,7 @@ fn main() {
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility).label("render_map"))
-        .add_system(render_status_panel)
+        .add_system(render_player_stats.chain(render_visible_entities))
         .add_system(render_log_panel)
         .add_system(toggle_inspector)
         .run();
@@ -321,30 +323,6 @@ pub fn update_fov(map: Res<Map>, mut units: Query<(&mut Fov, &Position), Changed
                     }
                 })
                 .collect();
-    }
-}
-
-fn render_status_panel(
-    mut terminal: Query<&mut Terminal, With<StatusTerminal>>,
-    player: Query<&Health, With<Player>>,
-) {
-    if let Ok(mut terminal) = terminal.get_single_mut() {
-        terminal.clear();
-        terminal.draw_box_single([0, 0], STATUS_PANEL_SIZE);
-        if let Ok(health) = player.get_single() {
-            let x = 0;
-            terminal.draw_titled_bar(
-                [x + 1, STATUS_PANEL_SIZE[1] as i32 - 4],
-                &format!("HP: {}/{}", health.current, health.max),
-                health.current as i32,
-                health.max as i32,
-                TitleBarStyle {
-                    width: STATUS_PANEL_SIZE[0] as usize - 2,
-                    filled: CharFormat::new(Color::WHITE, Color::RED),
-                    empty: CharFormat::new(Color::WHITE, Color::MAROON),
-                },
-            );
-        }
     }
 }
 
