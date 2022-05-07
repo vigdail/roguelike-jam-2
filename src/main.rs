@@ -180,19 +180,16 @@ fn keyboard_handling(
     mut states: ResMut<State<GameState>>,
     players: Query<(Entity, &Position), With<Player>>,
 ) {
-    let players = players.get_single();
-    if players.is_err() {
-        return;
-    }
+    let (player, &player_pos) = match players.get_single() {
+        Ok(players) => players,
+        Err(_) => return,
+    };
 
-    let (player, &player_pos) = players.unwrap();
+    let key = match input.get_just_pressed().next() {
+        Some(key) => key,
+        None => return,
+    };
 
-    let just_pressed = input.get_just_pressed().next();
-    if just_pressed.is_none() {
-        return;
-    }
-
-    let key = just_pressed.cloned().unwrap();
     let mut delta = Position::new(0, 0);
     match key {
         KeyCode::Numpad8 | KeyCode::Up => delta.y += 1,

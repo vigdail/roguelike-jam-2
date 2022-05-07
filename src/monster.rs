@@ -91,14 +91,13 @@ pub fn spawn_monster(commands: &mut Commands, position: Position) -> Entity {
 pub fn monster_ai(
     mut commands: Commands,
     map: Res<Map>,
-    players: Query<&Position, With<Player>>,
+    player: Query<&Position, With<Player>>,
     monsters: Query<(Entity, &Position), With<Monster>>,
 ) {
-    let player_pos = players.get_single();
-    if player_pos.is_err() {
-        return;
-    }
-    let player_pos = player_pos.unwrap();
+    let player_pos = match player.get_single() {
+        Ok(pos) => pos,
+        Err(_) => return,
+    };
     let vision_distance_squared = 36.0; // TODO
     for (monster_entity, monster_pos) in monsters.iter() {
         let player_pos = player_pos.into();

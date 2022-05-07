@@ -38,18 +38,16 @@ fn handle_inventory_input(
     mut states: ResMut<State<GameState>>,
     player: Query<Entity, With<Player>>,
 ) {
-    let player = player.get_single();
-    if player.is_err() {
-        return;
-    }
-    let player = player.unwrap();
+    let player = match player.get_single() {
+        Ok(player) => player,
+        Err(_) => return,
+    };
 
-    let just_pressed = input.get_just_pressed().next();
-    if just_pressed.is_none() {
-        return;
-    }
+    let key = match input.get_just_pressed().next() {
+        Some(key) => key,
+        None => return,
+    };
 
-    let key = just_pressed.unwrap();
     if key == &KeyCode::Escape {
         states.pop().unwrap()
     };
@@ -74,18 +72,16 @@ fn handle_drop_input(
     mut states: ResMut<State<GameState>>,
     player: Query<Entity, With<Player>>,
 ) {
-    let player = player.get_single();
-    if player.is_err() {
-        return;
-    }
-    let player = player.unwrap();
+    let player = match player.get_single() {
+        Ok(player) => player,
+        Err(_) => return,
+    };
 
-    let just_pressed = input.get_just_pressed().next();
-    if just_pressed.is_none() {
-        return;
-    }
+    let key = match input.get_just_pressed().next() {
+        Some(key) => key,
+        None => return,
+    };
 
-    let key = just_pressed.unwrap();
     if key == &KeyCode::Escape {
         states.pop().unwrap()
     };

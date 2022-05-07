@@ -46,16 +46,15 @@ pub fn render_visible_entities(
     items: Query<(&Name, &Tile), With<Item>>,
     mut terminal: Query<&mut Terminal, With<StatusTerminal>>,
 ) {
-    let player = player.get_single();
-    if player.is_err() {
-        return;
-    }
+    let (fov, player_pos) = match player.get_single() {
+        Ok(player) => player,
+        Err(_) => return,
+    };
 
     let y_offset = 7;
     let mut y = STATUS_PANEL_SIZE[1] as i32 - y_offset;
     let max_monsters = STATUS_PANEL_SIZE[1] - y as u32 / 3;
 
-    let (fov, player_pos) = player.unwrap();
     let visible_entities = fov
         .visible_tiles
         .iter()
