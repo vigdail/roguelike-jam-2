@@ -16,7 +16,7 @@ mod utils;
 
 use crate::components::*;
 use bevy::{prelude::*, window::PresentMode};
-use bevy_ascii_terminal::{Terminal, TerminalBundle, TerminalPlugin, Tile};
+use bevy_ascii_terminal::{Pivot, StringFormat, Terminal, TerminalBundle, TerminalPlugin, Tile};
 use bevy_inspector_egui::{WorldInspectorParams, WorldInspectorPlugin};
 use bevy_tiled_camera::{TiledCameraBundle, TiledCameraPlugin};
 use bracket_lib::prelude::field_of_view_set;
@@ -80,7 +80,7 @@ fn main() {
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility).label("render_map"))
         .add_system(render_player_stats.chain(render_visible_entities))
-        .add_system(render_log_panel)
+        .add_system(render_log_panel.chain(render_hint_text))
         .add_system(toggle_inspector)
         .add_system_to_stage(CoreStage::First, clear_undercursor)
         .add_system_to_stage(CoreStage::PreUpdate, cursor_hint)
@@ -348,5 +348,22 @@ fn render_log_panel(mut terminal: Query<&mut Terminal, With<LogTerminal>>, game_
             .for_each(|(i, log)| {
                 terminal.put_string([2, (count - i) as i32], log);
             });
+    }
+}
+
+fn render_hint_text(
+    mut terminal: Query<&mut Terminal, With<LogTerminal>>,
+    highlighted: Query<&Name, With<UnderCursor>>,
+) {
+    if let Some((mut terminal, name)) = terminal
+        .get_single_mut()
+        .ok()
+        .zip(highlighted.get_single().ok())
+    {
+        let text = format!("You see {}", name);
+        let x = 3;
+        let y = terminal.height() as i32 - 1;
+        let format = StringFormat::default().with_pivot(Pivot::BottomRight);
+        terminal.put_string_formatted([x, y], &text, format);
     }
 }
