@@ -95,28 +95,28 @@ impl Plugin for CombatPlugin {
 pub fn combat(
     mut game_log: ResMut<GameLog>,
     mut attack_events: EventReader<AttackEvent>,
-    attackers: Query<(&Name, &Attack)>,
+    mut attackers: Query<(&Name, &Attack)>,
     mut victims: Query<(&mut Health, Option<&Name>)>,
 ) {
     let mut rng = RandomNumberGenerator::new();
     for event in attack_events.iter() {
-        let attacker = attackers.get(event.attacker).ok();
-        let victim = victims.get_mut(event.target).ok();
+        let (attacker_name, attack) = match attackers.get_mut(event.attacker) {
+            Ok(attacker) => attacker,
+            Err(_) => continue,
+        };
+        let (mut victim_health, victim_name) = match victims.get_mut(event.target) {
+            Ok(victim) => victim,
+            Err(_) => continue,
+        };
 
-        if let Some((mut victim_health, victim_name)) = victim {
-            let damage = attacker
-                .map(|(_, attack)| attack.dice.roll(&mut rng))
-                .unwrap_or(0);
+        let damage = attack.dice.roll(&mut rng);
 
-            let attacker_name = attacker.map(|(name, _)| name).cloned().unwrap_or_default();
-
-            victim_health.take_damage(damage);
-            let victim_name = victim_name.cloned().unwrap_or_else(|| Name::new("Unknown"));
-            game_log.push(format!(
-                "{} attacks {} with {} damage",
-                attacker_name, victim_name, damage
-            ));
-        }
+        victim_health.take_damage(damage);
+        let victim_name = victim_name.cloned().unwrap_or_else(|| Name::new("Unknown"));
+        game_log.push(format!(
+            "{} attacks {} with {} damage",
+            attacker_name, victim_name, damage
+        ));
     }
 }
 

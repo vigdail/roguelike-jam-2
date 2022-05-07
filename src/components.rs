@@ -30,7 +30,7 @@ pub struct Unrevealable;
 #[derive(Component, Clone, Copy)]
 pub struct Visible;
 
-#[derive(Component, Default, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Component, Default, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -96,5 +96,41 @@ impl Fov {
             visible_tiles: HashSet::new(),
             range,
         }
+    }
+}
+
+#[derive(Default, Debug, Component)]
+pub struct Energy(pub i32);
+
+#[derive(Debug, Component)]
+pub struct Speed(pub i32);
+
+#[derive(Default, Debug, Component)]
+pub struct Actor;
+
+#[derive(Debug, Component)]
+pub struct TakingATurn;
+
+#[derive(Bundle)]
+pub struct MovingEntityBundle {
+    pub position: Position,
+    pub energy: Energy,
+    pub speed: Speed,
+    pub actor: Actor,
+}
+
+impl MovingEntityBundle {
+    pub fn new(speed: i32) -> Self {
+        Self {
+            speed: Speed(speed),
+            position: Position::default(),
+            energy: Default::default(),
+            actor: Default::default(),
+        }
+    }
+
+    pub fn with_position(mut self, position: Position) -> Self {
+        self.position = position;
+        self
     }
 }
