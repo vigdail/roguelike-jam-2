@@ -5,7 +5,6 @@ use crate::{
     components::{MapViewTerminal, Player},
     items::{InBackpack, WantDropItem, WantUseItem},
     resources::GameState,
-    turn::NextState,
 };
 
 pub struct InventoryPlugin;
@@ -32,7 +31,6 @@ impl Plugin for InventoryPlugin {
 fn handle_inventory_input(
     backpack: In<HashMap<char, Entity>>,
     mut commands: Commands,
-    mut next_state: ResMut<NextState>,
     input: Res<Input<KeyCode>>,
     mut char_evr: EventReader<ReceivedCharacter>,
     mut states: ResMut<State<GameState>>,
@@ -59,14 +57,13 @@ fn handle_inventory_input(
         .and_then(|c| backpack.0.get(&c))
     {
         commands.entity(player).insert(WantUseItem { item: entity });
-        next_state.0 = Some(GameState::Turn);
+        states.pop().unwrap();
     }
 }
 
 fn handle_drop_input(
     backpack: In<HashMap<char, Entity>>,
     mut commands: Commands,
-    mut next_state: ResMut<NextState>,
     input: Res<Input<KeyCode>>,
     mut char_evr: EventReader<ReceivedCharacter>,
     mut states: ResMut<State<GameState>>,
@@ -95,7 +92,7 @@ fn handle_drop_input(
         commands
             .entity(player)
             .insert(WantDropItem { item: entity });
-        next_state.0 = Some(GameState::Turn);
+        states.pop().unwrap();
     }
 }
 

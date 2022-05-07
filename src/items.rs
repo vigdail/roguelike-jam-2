@@ -3,11 +3,10 @@ use bevy_ascii_terminal::Tile;
 
 use crate::{
     combat::Health,
-    components::{Layer, Position, Unrevealable},
+    components::{Energy, Layer, Position, Unrevealable},
     events::{PickupEvent, WantPickup},
     log::GameLog,
     map::Map,
-    resources::GameState,
     LAYER_ITEM,
 };
 
@@ -38,13 +37,11 @@ pub struct ItemPlugin;
 
 impl Plugin for ItemPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PickupEvent>().add_system_set(
-            SystemSet::on_enter(GameState::Turn)
-                .with_system(handle_want_pickup)
-                .with_system(handle_pickup.after(handle_want_pickup))
-                .with_system(handle_use_item)
-                .with_system(handle_drop_item),
-        );
+        app.add_event::<PickupEvent>()
+            .add_system(handle_want_pickup)
+            .add_system(handle_pickup.after(handle_want_pickup))
+            .add_system(handle_use_item)
+            .add_system(handle_drop_item);
     }
 }
 
@@ -68,11 +65,11 @@ pub fn health_potion(commands: &mut Commands, position: Position) -> Entity {
 pub fn handle_want_pickup(
     mut commands: Commands,
     map: Res<Map>,
-    actors: Query<(Entity, &Position), With<WantPickup>>,
+    mut actors: Query<(Entity, &Position, &mut Energy), With<WantPickup>>,
     mut pickup_events: EventWriter<PickupEvent>,
     items: Query<&Item>,
 ) {
-    for (collector, position) in actors.iter() {
+    for (collector, position, mut energy) in actors.iter_mut() {
         if let Some(&item) = map
             .at_position(position)
             .iter()
@@ -82,6 +79,7 @@ pub fn handle_want_pickup(
                 collected_by: collector,
                 item,
             });
+            energy.0 = 0;
         }
         commands.entity(collector).remove::<WantPickup>();
     }

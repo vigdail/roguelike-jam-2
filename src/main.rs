@@ -28,7 +28,7 @@ use itertools::Itertools;
 use log::GameLog;
 use map::{Map, MapPlugin};
 use monster::MonsterPlugin;
-use resources::{CurrentTurn, GameState};
+use resources::GameState;
 use side_panel::{render_player_stats, render_visible_entities};
 use turn::TurnPlugin;
 use utils::{clear_undercursor, cursor_hint, Grayscale, UnderCursor};
@@ -48,7 +48,7 @@ const MAP_SIZE: [u32; 2] = [
 
 fn main() {
     App::new()
-        .add_state::<GameState>(GameState::WaitingInput)
+        .add_state::<GameState>(GameState::Gameplay)
         .add_event::<AttackEvent>()
         .add_event::<MoveEvent>()
         .insert_resource(WindowDescriptor {
@@ -61,7 +61,6 @@ fn main() {
         })
         .init_resource::<GameLog>()
         .insert_resource(ClearColor(Color::BLACK))
-        .insert_resource(CurrentTurn::Player)
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(TerminalPlugin)
@@ -73,9 +72,6 @@ fn main() {
         .add_plugin(CombatPlugin)
         .add_plugin(InventoryPlugin)
         .add_startup_system(setup_camera)
-        .add_system_set(
-            SystemSet::on_update(GameState::WaitingInput).with_system(keyboard_handling),
-        )
         .add_system(update_fov)
         .add_system(update_visibility.after(update_fov))
         .add_system(render_map.after(update_visibility).label("render_map"))
@@ -178,9 +174,9 @@ fn keyboard_handling(
     mut commands: Commands,
     mut input: ResMut<Input<KeyCode>>,
     mut states: ResMut<State<GameState>>,
-    players: Query<(Entity, &Position), With<Player>>,
+    mut players: Query<(Entity, &Position, &mut Energy), (With<Player>, With<TakingATurn>)>,
 ) {
-    let (player, &player_pos) = match players.get_single() {
+    let (player, &player_pos, mut energy) = match players.get_single_mut() {
         Ok(players) => players,
         Err(_) => return,
     };
@@ -212,7 +208,9 @@ fn keyboard_handling(
             delta.x += 1;
             delta.y -= 1;
         }
-        KeyCode::Numpad5 => {}
+        KeyCode::Numpad5 => {
+            energy.0 = 0;
+        }
         KeyCode::G => {
             commands.entity(player).insert(WantPickup);
         }
@@ -230,13 +228,11 @@ fn keyboard_handling(
     }
 
     if delta != Position::default() {
+        energy.0 = 0;
         commands.entity(player).insert(WantToMove {
             position: Position::new(player_pos.x + delta.x, player_pos.y + delta.y),
         });
     }
-
-    input.clear();
-    states.set(GameState::Turn).unwrap();
 }
 
 pub fn handle_want_to_move(
@@ -244,11 +240,11 @@ pub fn handle_want_to_move(
     mut attack_events: EventWriter<AttackEvent>,
     mut move_events: EventWriter<MoveEvent>,
     map: Res<Map>,
-    actors: Query<(Entity, &WantToMove)>,
+    mut actors: Query<(Entity, &WantToMove)>,
     blocks: Query<Entity, With<Blocker>>,
     victims: Query<Entity, With<Health>>,
 ) {
-    for (entity, to_move) in actors.iter() {
+    for (entity, to_move) in actors.iter_mut() {
         let at_position = map.tiles.get(&to_move.position);
         if at_position.is_none() {
             continue;
@@ -282,10 +278,14 @@ pub fn handle_want_to_move(
     }
 }
 
-pub fn movement(mut move_events: EventReader<MoveEvent>, mut actors: Query<&mut Position>) {
+pub fn movement(
+    mut move_events: EventReader<MoveEvent>,
+    mut actors: Query<(&mut Position, &mut Energy)>,
+) {
     for event in move_events.iter() {
-        if let Ok(mut position) = actors.get_mut(event.entity) {
+        if let Ok((mut position, mut energy)) = actors.get_mut(event.entity) {
             *position = event.position;
+            energy.0 = 0;
         }
     }
 }

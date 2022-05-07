@@ -6,10 +6,8 @@ use bracket_lib::prelude::{
 
 use crate::{
     combat::{Attack, CombatStatsBundle, Health},
-    components::{Blocker, Player, WantToMove},
+    components::{Blocker, Energy, MovingEntityBundle, Player, TakingATurn, WantToMove},
     map::Map,
-    resources::GameState,
-    turn::end_turn,
     Layer, Position, Unrevealable, LAYER_MONSTER,
 };
 
@@ -22,11 +20,12 @@ pub struct MonsterBundle {
     pub name: Name,
     pub unrevealable: Unrevealable,
     pub blocker: Blocker,
-    pub position: Position,
     pub tile: Tile,
     pub layer: Layer,
     #[bundle]
     pub combat_stats: CombatStatsBundle,
+    #[bundle]
+    pub moving: MovingEntityBundle,
 }
 
 impl Default for MonsterBundle {
@@ -41,12 +40,12 @@ impl Default for MonsterBundle {
                 fg_color: Color::RED,
                 bg_color: Color::BLACK,
             },
-            position: Position::default(),
             layer: Layer(LAYER_MONSTER),
             combat_stats: CombatStatsBundle {
                 health: Health::new(10),
                 attack: Attack::new((1, 4)),
             },
+            moving: MovingEntityBundle::new(40),
         }
     }
 }
@@ -55,20 +54,16 @@ pub struct MonsterPlugin;
 
 impl Plugin for MonsterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_enter(GameState::MonsterAi)
-                .with_system(monster_ai)
-                .with_system(end_turn.after(monster_ai)),
-        );
+        app.add_system(monster_ai);
     }
 }
 
 pub fn spawn_monster(commands: &mut Commands, position: Position) -> Entity {
     let mut rng = RandomNumberGenerator::new();
     let roll = rng.roll_dice(1, 6);
-    let (glyph, name, attack) = match roll {
-        1 => ('o', "Orc", Attack::new((1, 6))),
-        _ => ('g', "Goblin", Attack::new((1, 4))),
+    let (glyph, name, attack, speed) = match roll {
+        1 => ('o', "Orc", Attack::new((1, 6)), 30),
+        _ => ('g', "Goblin", Attack::new((1, 4)), 45),
     };
     let monster = MonsterBundle {
         monster: Monster,
@@ -78,11 +73,11 @@ pub fn spawn_monster(commands: &mut Commands, position: Position) -> Entity {
             fg_color: Color::RED,
             bg_color: Color::BLACK,
         },
-        position,
         combat_stats: CombatStatsBundle {
             health: Health::new(10),
             attack,
         },
+        moving: MovingEntityBundle::new(speed).with_position(position),
         ..Default::default()
     };
     commands.spawn_bundle(monster).id()
@@ -92,14 +87,15 @@ pub fn monster_ai(
     mut commands: Commands,
     map: Res<Map>,
     player: Query<&Position, With<Player>>,
-    monsters: Query<(Entity, &Position), With<Monster>>,
+    mut monsters: Query<(Entity, &Position, &mut Energy), (With<Monster>, With<TakingATurn>)>,
 ) {
     let player_pos = match player.get_single() {
         Ok(pos) => pos,
         Err(_) => return,
     };
     let vision_distance_squared = 36.0; // TODO
-    for (monster_entity, monster_pos) in monsters.iter() {
+    for (monster_entity, monster_pos, mut energy) in monsters.iter_mut() {
+        energy.0 = 0;
         let player_pos = player_pos.into();
         let monster_pos = monster_pos.into();
         if DistanceAlg::PythagorasSquared.distance2d(player_pos, monster_pos)
